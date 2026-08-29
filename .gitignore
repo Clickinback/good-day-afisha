@@ -5,6 +5,7 @@ node_modules
 .env.production
 .env.production.local
 .docker-data/
+deployment-transfer/
 .env.local
 *.log
 coverage
