@@ -50,11 +50,19 @@ docker image prune -f
 docker compose --env-file .env.production -f docker-compose.production.yml logs -f app scheduler caddy
 ```
 
-## Резервная копия базы
+## Автоматические резервные копии
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml exec -T database \
-  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > good-day-$(date +%F).sql.gz
+chmod +x scripts/backup-production.sh
+./scripts/backup-production.sh
 ```
 
-Каталог `public/media` также нужно регулярно копировать: в нём находятся загруженные изображения мероприятий.
+Скрипт сохраняет PostgreSQL и каталог `public/media`, создаёт контрольные суммы и удаляет локальные копии старше 14 дней. По умолчанию архивы находятся в `backups/`. Путь и срок хранения можно изменить переменными `BACKUP_DIR` и `BACKUP_RETENTION_DAYS`.
+
+Для ежедневного запуска в 03:15 добавьте задачу от пользователя, который управляет Docker:
+
+```bash
+(crontab -l 2>/dev/null; echo '15 3 * * * cd /ПУТЬ/К/good-day-afisha && ./scripts/backup-production.sh >> backups/backup.log 2>&1') | crontab -
+```
+
+После первого запуска обязательно проверьте каталог с новой копией и файл `SHA256SUMS`. Локальная копия защищает от сбоя базы, но не от потери VPS, поэтому каталог `backups/` также следует синхронизировать во внешнее хранилище.
