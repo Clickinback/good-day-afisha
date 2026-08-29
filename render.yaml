@@ -43,7 +43,10 @@ services:
     schedule: "0 * * * *"
     dockerfilePath: ./Dockerfile.render
     dockerContext: .
-    dockerCommand: sh -c 'curl --fail --silent --show-error --request POST --header "Authorization: Bearer ${CRON_SECRET}" "http://${APP_HOSTPORT}/api/internal/pipeline/run"'
+    dockerCommand: >-
+      sh -c 'curl --fail --silent --show-error --request POST --header
+      "Authorization: Bearer ${CRON_SECRET}"
+      "http://${APP_HOSTPORT}/api/internal/pipeline/run"'
     envVars:
       - key: APP_HOSTPORT
         fromService:
@@ -65,4 +68,3 @@ databases:
     user: good_day
     diskSizeGB: 5
     ipAllowList: []
-
