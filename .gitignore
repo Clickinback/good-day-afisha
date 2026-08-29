@@ -1,0 +1,14 @@
+node_modules
+.next
+.next-*
+.env
+.env.production
+.env.production.local
+.docker-data/
+.env.local
+*.log
+coverage
+tsconfig.tsbuildinfo
+public/media/events/*
+!public/media/events/.gitkeep
+prisma/*.db

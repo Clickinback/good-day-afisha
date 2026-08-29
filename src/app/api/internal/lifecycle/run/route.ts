@@ -1,0 +1,2 @@
+import { runLifecycle } from "@/modules/lifecycle/service";
+export async function POST(request:Request){const secret=request.headers.get("authorization")?.replace(/^Bearer\s+/i,"");if(!process.env.CRON_SECRET||secret!==process.env.CRON_SECRET)return Response.json({error:"Unauthorized"},{status:401});try{return Response.json({data:await runLifecycle()})}catch(error){return Response.json({error:error instanceof Error?error.message:"Lifecycle failed"},{status:500})}}

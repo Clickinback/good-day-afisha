@@ -1,0 +1,5 @@
+import type { MetadataRoute } from "next";
+import { cities,categories } from "@/data/demo";
+import { getSitemapEvents } from "@/data/events";
+import { getSitemapCollections } from "@/modules/collections/service";
+export default async function sitemap():Promise<MetadataRoute.Sitemap>{const base=process.env.NEXT_PUBLIC_SITE_URL??"http://localhost:3000";const [events,collections]=await Promise.all([getSitemapEvents(),getSitemapCollections()]);return [{url:base,changeFrequency:"daily",priority:1},...cities.flatMap(city=>[{url:`${base}/${city.slug}`,changeFrequency:"daily" as const,priority:.9},...["today","tomorrow","weekend","free","kids",...categories.map(c=>c.slug)].map(path=>({url:`${base}/${city.slug}/${path}`,changeFrequency:"daily" as const,priority:.7}))]),...collections.map(collection=>({url:`${base}/${collection.city.slug}/collections/${collection.slug}`,lastModified:collection.updatedAt,changeFrequency:"daily" as const,priority:.75})),...events.map(event=>({url:`${base}/${event.city.slug}/events/${event.slug}`,lastModified:event.updatedAt,changeFrequency:"weekly" as const,priority:event.status==="PUBLISHED"?.8:.5}))]}

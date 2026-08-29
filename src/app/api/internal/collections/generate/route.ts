@@ -1,0 +1,2 @@
+import { generateCollections } from "@/modules/collections/service";
+export async function POST(request:Request){if(!process.env.CRON_SECRET||request.headers.get("authorization")!==`Bearer ${process.env.CRON_SECRET}`)return Response.json({error:{code:"UNAUTHORIZED"}},{status:401});try{const data=await generateCollections();return Response.json({data,meta:{count:data.length}})}catch(error){return Response.json({error:{code:"GENERATION_FAILED",message:error instanceof Error?error.message:"Unknown error"}},{status:500})}}

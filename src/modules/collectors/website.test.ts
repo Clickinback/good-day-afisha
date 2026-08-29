@@ -1,0 +1,8 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { extractJsonLdEvents,extractSelectorLinks } from "./website";
+
+test("extracts Schema.org Event from JSON-LD",()=>{const html=`<script type="application/ld+json">{"@context":"https://schema.org","@type":"Event","@id":"concert-1","name":"Концерт N","description":"Вечерняя программа","startDate":"2026-09-01T19:00:00+03:00","url":"/events/n","image":"/n.jpg"}</script>`;const [item]=extractJsonLdEvents(html,"https://events.example.by/list");assert.equal(item.externalId,"concert-1");assert.equal(item.url,"https://events.example.by/events/n");assert.match(item.rawText,/Концерт N/);assert.equal(item.imageUrl,"https://events.example.by/n.jpg")});
+test("extracts nested Schema.org ScreeningEvent",()=>{const html=`<script type="application/ld+json">{"@type":"CollectionPage","mainEntity":{"@type":"ItemList","itemListElement":[{"@type":"ListItem","item":{"@type":"ScreeningEvent","name":"Фильм","startDate":"2026-09-01T19:00:00+03:00","url":"/kino/film"}}]}}</script>`;const [item]=extractJsonLdEvents(html,"https://events.example.by/kino");assert.equal(item.url,"https://events.example.by/kino/film");assert.match(item.rawText,/Фильм/)});
+test("extracts and resolves configured detail links",()=>{const html=`<div class="event"><a class="more" href="/one">One</a></div><div class="event"><a class="more" href="https://other.example/two">Two</a></div>`;assert.deepEqual(extractSelectorLinks(html,"https://example.by/events",{itemSelector:".event",linkSelector:".more"}),["https://example.by/one","https://other.example/two"])});
+test("ignores malformed JSON-LD",()=>{assert.deepEqual(extractJsonLdEvents(`<script type="application/ld+json">{oops}</script>`,"https://example.by"),[])});

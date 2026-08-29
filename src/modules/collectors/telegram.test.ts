@@ -1,0 +1,4 @@
+import assert from "node:assert/strict";import test from "node:test";import { extractTelegramPosts } from "./telegram";
+const html=`<div class="tgme_widget_message_wrap"><div class="tgme_widget_message" data-post="channel/42"><a class="tgme_widget_message_photo_wrap" style="background-image:url('https://cdn.example/post.jpg')"></a><div class="tgme_widget_message_text">Концерт 1 сентября в 19:00</div><time datetime="2026-08-28T10:00:00+00:00"></time></div></div>`;
+test("extracts a public Telegram post",()=>{const [post]=extractTelegramPosts(html,"https://t.me/s/channel");assert.equal(post.externalId,"channel/42");assert.match(post.rawText,/Концерт/);assert.equal(post.imageUrl,"https://cdn.example/post.jpg")});
+test("ignores forwarded posts by default",()=>assert.equal(extractTelegramPosts(html.replace('data-post="channel/42"','data-post="channel/42"><span class="tgme_widget_message_forwarded_from"'),"https://t.me/s/channel").length,0));

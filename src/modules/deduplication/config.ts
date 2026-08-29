@@ -1,0 +1,1 @@
+export const deduplicationConfig={autoMatchThreshold:.88,moderationThreshold:.64,minAutoMatchGap:.08,candidateWindowHours:36,maxCandidates:30,weights:{title:.4,date:.2,time:.1,venue:.15,city:.1,organizer:.05}} as const;

@@ -1,0 +1,2 @@
+import { listPublicCollections } from "@/modules/collections/service";
+export async function GET(request:Request){const city=new URL(request.url).searchParams.get("city");if(!city)return Response.json({error:{code:"CITY_REQUIRED",message:"Query parameter city is required"}},{status:400});try{const data=await listPublicCollections(city);return Response.json({data,meta:{count:data.length}})}catch{return Response.json({error:{code:"DATABASE_UNAVAILABLE",message:"Collections are temporarily unavailable"}},{status:503})}}

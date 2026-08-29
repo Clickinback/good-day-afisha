@@ -1,0 +1,13 @@
+import { deduplicationConfig } from "./config";
+export type ComparableEvent={title:string;startsAt:Date;city:string;venue?:string|null;organizer?:string|null};
+export type ScoreBreakdown={total:number;title:number;date:number;time:number;venue:number|null;city:number;organizer:number|null;weights:Record<string,number>};
+const stop=new Set(["и","в","на","с","из","для","концерт","выступление","шоу","the","a"]);
+export function normalize(value:string){return value.toLowerCase().replace(/ё/g,"е").replace(/[«»"'`]/g,"").replace(/[^a-zа-я0-9]+/gi," ").trim()}
+function stem(token:string){if(/[а-я]/.test(token)&&token.length>4)return token.replace(/(иями|ами|ями|ого|ему|ыми|ими|ой|ей|ам|ям|ах|ях|ов|ев|ом|ем|а|я|ы|и|у|ю|е)$/u,"");return token}
+function tokens(value:string){return new Set(normalize(value).split(/\s+/).filter(token=>(token.length>1||/^[a-z0-9]$/i.test(token))&&!stop.has(token)).map(stem))}
+function jaccard(a:Set<string>,b:Set<string>){if(!a.size&&!b.size)return 1;const intersection=[...a].filter(x=>b.has(x)).length;return intersection/(a.size+b.size-intersection)}
+function trigrams(value:string){const text=`  ${normalize(value)}  `;const result=new Set<string>();for(let i=0;i<text.length-2;i++)result.add(text.slice(i,i+3));return result}
+function dice(a:Set<string>,b:Set<string>){if(!a.size&&!b.size)return 1;const overlap=[...a].filter(x=>b.has(x)).length;return 2*overlap/(a.size+b.size)}
+export function textSimilarity(a:string,b:string){if(!a&&!b)return 1;if(!a||!b)return 0;return .65*jaccard(tokens(a),tokens(b))+.35*dice(trigrams(a),trigrams(b))}
+function sameCalendarDay(a:Date,b:Date){return a.getUTCFullYear()===b.getUTCFullYear()&&a.getUTCMonth()===b.getUTCMonth()&&a.getUTCDate()===b.getUTCDate()}
+export function scoreEvents(incoming:ComparableEvent,candidate:ComparableEvent):ScoreBreakdown{const title=textSimilarity(incoming.title,candidate.title);const date=sameCalendarDay(incoming.startsAt,candidate.startsAt)?1:0;const minutes=Math.abs(+incoming.startsAt-+candidate.startsAt)/60000;const time=minutes<=30?1:minutes<=120?.7:minutes<=360?.3:0;const venue=incoming.venue&&candidate.venue?textSimilarity(incoming.venue,candidate.venue):null;const city=normalize(incoming.city)===normalize(candidate.city)?1:0;const organizer=incoming.organizer&&candidate.organizer?textSimilarity(incoming.organizer,candidate.organizer):null;const values={title,date,time,venue,city,organizer};let weighted=0,weightTotal=0;for(const [key,weight] of Object.entries(deduplicationConfig.weights)){const value=values[key as keyof typeof values];if(value===null)continue;weighted+=value*weight;weightTotal+=weight}return {total:weightTotal?weighted/weightTotal:0,title,date,time,venue,city,organizer,weights:{...deduplicationConfig.weights}}}

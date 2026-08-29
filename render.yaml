@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: good-day-afisha
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /api/health
+    preDeployCommand: pnpm prisma migrate deploy
+    autoDeployTrigger: commit
+    disk:
+      name: event-media
+      mountPath: /app/public/media
+      sizeGB: 10
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: good-day-afisha-db
+          property: connectionString
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: COLLECTOR_USER_AGENT
+        value: GoodDayAfishaBot/1.0
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_EVENT_PARSER_MODEL
+        sync: false
+      - key: OPENAI_REQUEST_TIMEOUT_MS
+        value: "120000"
+
+  - type: cron
+    name: good-day-afisha-pipeline
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    schedule: "0 * * * *"
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    dockerCommand: sh -c 'curl --fail --silent --show-error --request POST --header "Authorization: Bearer ${CRON_SECRET}" "http://${APP_HOSTPORT}/api/internal/pipeline/run"'
+    envVars:
+      - key: APP_HOSTPORT
+        fromService:
+          type: web
+          name: good-day-afisha
+          property: hostport
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: good-day-afisha
+          envVarKey: CRON_SECRET
+
+databases:
+  - name: good-day-afisha-db
+    plan: 0.1c-256mb
+    region: frankfurt
+    postgresMajorVersion: "17"
+    databaseName: good_day_afisha
+    user: good_day
+    diskSizeGB: 5
+    ipAllowList: []
+

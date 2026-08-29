@@ -1,0 +1,12 @@
+CREATE TYPE "CollectionKind" AS ENUM ('AUTOMATIC', 'EDITORIAL');
+CREATE TABLE "Collection" ("id" TEXT NOT NULL,"cityId" TEXT NOT NULL,"slug" TEXT NOT NULL,"title" TEXT NOT NULL,"description" TEXT,"kind" "CollectionKind" NOT NULL DEFAULT 'AUTOMATIC',"rule" JSONB NOT NULL,"active" BOOLEAN NOT NULL DEFAULT true,"generatedAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "Collection_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "CollectionEvent" ("collectionId" TEXT NOT NULL,"eventId" TEXT NOT NULL,"position" INTEGER NOT NULL,"pinned" BOOLEAN NOT NULL DEFAULT false,"addedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "CollectionEvent_pkey" PRIMARY KEY ("collectionId","eventId"));
+CREATE TABLE "CollectionExclusion" ("collectionId" TEXT NOT NULL,"eventId" TEXT NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "CollectionExclusion_pkey" PRIMARY KEY ("collectionId","eventId"));
+CREATE UNIQUE INDEX "Collection_cityId_slug_key" ON "Collection"("cityId","slug");
+CREATE INDEX "Collection_active_generatedAt_idx" ON "Collection"("active","generatedAt");
+CREATE INDEX "CollectionEvent_collectionId_position_idx" ON "CollectionEvent"("collectionId","position");
+ALTER TABLE "Collection" ADD CONSTRAINT "Collection_cityId_fkey" FOREIGN KEY ("cityId") REFERENCES "City"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "CollectionEvent" ADD CONSTRAINT "CollectionEvent_collectionId_fkey" FOREIGN KEY ("collectionId") REFERENCES "Collection"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "CollectionEvent" ADD CONSTRAINT "CollectionEvent_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "CollectionExclusion" ADD CONSTRAINT "CollectionExclusion_collectionId_fkey" FOREIGN KEY ("collectionId") REFERENCES "Collection"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "CollectionExclusion" ADD CONSTRAINT "CollectionExclusion_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Event"("id") ON DELETE CASCADE ON UPDATE CASCADE;

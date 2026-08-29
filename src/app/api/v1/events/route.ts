@@ -1,0 +1,2 @@
+import { getPublicEvents } from "@/data/events";
+export async function GET(request:Request){const p=new URL(request.url).searchParams;const data=await getPublicEvents({city:p.get("city")??undefined,period:p.get("period")??undefined,category:p.get("category")??undefined,free:p.get("free")==="true",kids:p.get("kids")==="true",q:p.get("q")??undefined});return Response.json({data,meta:{count:data.length}})}
