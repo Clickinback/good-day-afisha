@@ -5,6 +5,8 @@ PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ENV_FILE=${ENV_FILE:-"$PROJECT_DIR/.env.production"}
 BACKUP_DIR=${BACKUP_DIR:-"$PROJECT_DIR/backups"}
 BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+BACKUP_REMOTE=${BACKUP_REMOTE:-}
+BACKUP_REMOTE_RETENTION_DAYS=${BACKUP_REMOTE_RETENTION_DAYS:-90}
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.production.yml"
 STAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
 TARGET="$BACKUP_DIR/$STAMP"
@@ -44,7 +46,22 @@ test -s "$TEMP_TARGET/media.tar.gz"
 )
 
 mv "$TEMP_TARGET" "$TARGET"
+
+if [ -n "$BACKUP_REMOTE" ]; then
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "BACKUP_REMOTE is set, but rclone is not installed." >&2
+    exit 1
+  fi
+
+  REMOTE_TARGET="${BACKUP_REMOTE%/}/$STAMP"
+  rclone copy "$TARGET" "$REMOTE_TARGET" --immutable
+  rclone check "$TARGET" "$REMOTE_TARGET" --one-way
+  rclone delete "${BACKUP_REMOTE%/}" --min-age "${BACKUP_REMOTE_RETENTION_DAYS}d"
+  rclone rmdirs "${BACKUP_REMOTE%/}" --leave-root
+  echo "Encrypted remote backup verified: $REMOTE_TARGET"
+fi
+
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d \
   -name '????-??-??T??-??-??Z' -mtime "+$BACKUP_RETENTION_DAYS" -exec rm -rf {} +
 
-echo "Backup created: $TARGET"
+echo "Local backup created: $TARGET"

@@ -59,10 +59,16 @@ chmod +x scripts/backup-production.sh
 
 Скрипт сохраняет PostgreSQL и каталог `public/media`, создаёт контрольные суммы и удаляет локальные копии старше 14 дней. По умолчанию архивы находятся в `backups/`. Путь и срок хранения можно изменить переменными `BACKUP_DIR` и `BACKUP_RETENTION_DAYS`.
 
+Если настроен зашифрованный remote `rclone`, укажите `BACKUP_REMOTE`. После загрузки скрипт сверяет локальную и облачную копии. Облачные копии по умолчанию хранятся 90 дней:
+
+```bash
+BACKUP_REMOTE='gcrypt:' BACKUP_REMOTE_RETENTION_DAYS=90 ./scripts/backup-production.sh
+```
+
 Для ежедневного запуска в 03:15 добавьте задачу от пользователя, который управляет Docker:
 
 ```bash
-(crontab -l 2>/dev/null; echo '15 3 * * * cd /ПУТЬ/К/good-day-afisha && ./scripts/backup-production.sh >> backups/backup.log 2>&1') | crontab -
+(crontab -l 2>/dev/null; echo "15 3 * * * cd /ПУТЬ/К/good-day-afisha && BACKUP_REMOTE='gcrypt:' BACKUP_REMOTE_RETENTION_DAYS=90 ./scripts/backup-production.sh >> backups/backup.log 2>&1") | crontab -
 ```
 
-После первого запуска обязательно проверьте каталог с новой копией и файл `SHA256SUMS`. Локальная копия защищает от сбоя базы, но не от потери VPS, поэтому каталог `backups/` также следует синхронизировать во внешнее хранилище.
+После первого запуска обязательно проверьте локальный каталог, файл `SHA256SUMS` и наличие новой зашифрованной папки через `rclone lsf gcrypt:`. Никогда не храните ключ `rclone crypt` только на VPS.
