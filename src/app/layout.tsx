@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -31,6 +32,18 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#3561f4" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="ru" data-scroll-behavior="smooth"><body className={manrope.variable}><Header />{children}<Footer /></body></html>;
+  return (
+    <html lang="ru" data-scroll-behavior="smooth">
+      <body className={manrope.variable}>
+        <Header />
+        {children}
+        <Footer />
+        <Script
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          strategy="afterInteractive"
+          data-cf-beacon='{"token":"c71c3145bbdd4ce0bf78b597e8a28653"}'
+        />
+      </body>
+    </html>
+  );
 }
-
