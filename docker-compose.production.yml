@@ -1,7 +1,15 @@
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
 services:
   database:
     image: postgres:17-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-good_day_afisha}
       POSTGRES_USER: ${POSTGRES_USER:-good_day}
@@ -19,6 +27,7 @@ services:
       context: .
       target: migrator
     restart: "no"
+    logging: *default-logging
     env_file: ${ENV_FILE:-.env.production}
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-good_day}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-good_day_afisha}?schema=public
@@ -30,6 +39,7 @@ services:
   app:
     build: .
     restart: unless-stopped
+    logging: *default-logging
     env_file: ${ENV_FILE:-.env.production}
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-good_day}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-good_day_afisha}?schema=public
@@ -51,6 +61,7 @@ services:
   scheduler:
     image: alpine:3.21
     restart: unless-stopped
+    logging: *default-logging
     env_file: ${ENV_FILE:-.env.production}
     depends_on:
       app:
@@ -67,6 +78,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN in .env.production}
     ports:

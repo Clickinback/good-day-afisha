@@ -50,6 +50,8 @@ docker image prune -f
 docker compose --env-file .env.production -f docker-compose.production.yml logs -f app scheduler caddy
 ```
 
+Для всех production-контейнеров используется Docker logging driver `local`. Каждый контейнер хранит не более пяти сжатых файлов по 20 МБ, поэтому журналы не могут бесконтрольно заполнить диск VPS.
+
 ## Автоматические резервные копии
 
 ```bash
