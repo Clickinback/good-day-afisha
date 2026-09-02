@@ -22,10 +22,16 @@
    openssl rand -base64 48
    ```
 
-4. Запустите стек:
+4. Если на VPS уже работает общий reverse proxy, запустите приложение без встроенного Caddy:
 
    ```bash
    docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+   ```
+
+   Для отдельного VPS без другого reverse proxy включите профиль со встроенным Caddy:
+
+   ```bash
+   docker compose --env-file .env.production -f docker-compose.production.yml --profile standalone-proxy up -d --build
    ```
 
 5. Проверьте состояние:
@@ -35,7 +41,7 @@
    curl https://ВАШ-ДОМЕН/api/health
    ```
 
-Caddy автоматически получает и обновляет HTTPS-сертификат. Миграции Prisma выполняются до запуска приложения. Планировщик запускает полный цикл сбора с интервалом `PIPELINE_INTERVAL_SECONDS`.
+При использовании профиля `standalone-proxy` Caddy автоматически получает и обновляет HTTPS-сертификат. Если используется общий reverse proxy другого стека, он должен направлять домен на контейнер приложения. Миграции Prisma выполняются до запуска приложения. Планировщик запускает полный цикл сбора с интервалом `PIPELINE_INTERVAL_SECONDS`.
 
 ## Обновление
 
