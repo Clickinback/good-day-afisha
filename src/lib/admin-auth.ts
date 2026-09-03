@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -16,6 +16,14 @@ export function isValidAdminToken(value?: string) {
   const expected = signature();
   if (!value || !expected || value.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+}
+
+export function isValidAdminPassword(value: string) {
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected) return false;
+  const actualHash = createHash("sha256").update(value).digest();
+  const expectedHash = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(actualHash, expectedHash);
 }
 
 export async function isAdmin() {

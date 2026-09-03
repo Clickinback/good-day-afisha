@@ -1,15 +1,18 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createAdminSession,destroyAdminSession,requireAdmin } from "@/lib/admin-auth";
+import { createAdminSession,destroyAdminSession,isValidAdminPassword,requireAdmin } from "@/lib/admin-auth";
+import { clearAdminLoginFailures,getAdminLoginLockSeconds,recordAdminLoginFailure } from "@/lib/admin-login-throttle";
 import { prisma } from "@/lib/prisma";
 import { eventFormSchema,type EventFormState } from "@/modules/admin/schemas";
 import { sourceFormSchema,type AdminFormState } from "@/modules/admin/schemas";
 
 export async function login(_: {error?:string},formData:FormData):Promise<{error?:string}>{
+  const lockSeconds=await getAdminLoginLockSeconds();
+  if(lockSeconds>0)return {error:`Слишком много попыток. Повторите через ${Math.ceil(lockSeconds/60)} мин.`};
   const submitted=String(formData.get("password")??"");
-  const expected=process.env.ADMIN_PASSWORD;
-  if(!expected||submitted!==expected)return {error:"Неверный пароль или ADMIN_PASSWORD не настроен"};
+  if(!isValidAdminPassword(submitted)){await recordAdminLoginFailure();return {error:"Неверный пароль"};}
+  await clearAdminLoginFailures();
   await createAdminSession(); redirect("/admin");
 }
 export async function logout(){await destroyAdminSession();redirect("/admin/login")}
