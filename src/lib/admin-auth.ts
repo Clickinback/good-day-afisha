@@ -1,21 +1,21 @@
 import "server-only";
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { ADMIN_SESSION_SECONDS, createAdminToken, validateAdminToken } from "@/lib/admin-session-token";
 
 const COOKIE = "good-day-admin";
 
-function signature() {
+function credentials() {
   const password = process.env.ADMIN_PASSWORD;
   const secret = process.env.AUTH_SECRET;
   if (!password || !secret || secret.length < 32) return null;
-  return createHmac("sha256", secret).update(password).digest("hex");
+  return { password, secret };
 }
 
 export function isValidAdminToken(value?: string) {
-  const expected = signature();
-  if (!value || !expected || value.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+  const configured = credentials();
+  return configured ? validateAdminToken(value, configured.password, configured.secret) : false;
 }
 
 export function isValidAdminPassword(value: string) {
@@ -35,9 +35,10 @@ export async function requireAdmin() {
 }
 
 export async function createAdminSession() {
-  const value = signature();
-  if (!value) throw new Error("ADMIN_PASSWORD и AUTH_SECRET должны быть настроены");
-  (await cookies()).set(COOKIE, value, { httpOnly:true, secure:process.env.NODE_ENV==="production", sameSite:"strict", path:"/", maxAge:60*60*8 });
+  const configured = credentials();
+  if (!configured) throw new Error("ADMIN_PASSWORD и AUTH_SECRET должны быть настроены");
+  const value = createAdminToken(configured.password, configured.secret);
+  (await cookies()).set(COOKIE, value, { httpOnly:true, secure:process.env.NODE_ENV==="production", sameSite:"strict", path:"/", maxAge:ADMIN_SESSION_SECONDS, priority:"high" });
 }
 
 export async function destroyAdminSession() {
