@@ -6,9 +6,12 @@ import { cities, events } from "./demo";
 import type { City, Event, EventFilters } from "@/modules/events/types";
 
 const fallbackImage = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1400&q=80";
-const eventInclude = { city: true, venue: true, category: true, occurrences: { orderBy: { startsAt: "asc" as const } } };
+const eventInclude = { city: true, venue: true, category: true, organizer: true, occurrences: { orderBy: { startsAt: "asc" as const } } };
 type DbEventBase = Prisma.EventGetPayload<{ include: { city: true; venue: true; category: true } }>;
-type DbEvent = DbEventBase & { occurrences?: Prisma.EventOccurrenceGetPayload<Record<string, never>>[] };
+type DbEvent = DbEventBase & {
+  organizer?: Prisma.OrganizerGetPayload<Record<string, never>> | null;
+  occurrences?: Prisma.EventOccurrenceGetPayload<Record<string, never>>[];
+};
 const preposition = (name: string) => name === "Полоцк" ? "в Полоцке" : name === "Новополоцк" ? "в Новополоцке" : `в ${name}`;
 const demoCity = (slug: string) => cities.find((city) => city.slug === slug);
 const demoEvent = (slug: string) => events.find((event) => event.slug === slug);
@@ -44,6 +47,9 @@ export function mapEvent(row: DbEvent): Event {
     priceMax: row.priceMax === null ? null : Number(row.priceMax),
     isFree: row.isFree, ageRestriction: row.ageRestriction ?? "Возраст уточняется",
     ticketUrl: row.ticketUrl ?? undefined, featured: row.isFeatured, status: row.status,
+    currency: row.currency,
+    organizer: row.organizer ? { name: row.organizer.name, websiteUrl: row.organizer.websiteUrl ?? undefined } : undefined,
+    canonicalSourceUrl: row.canonicalSourceUrl ?? undefined,
     occurrences: (row.occurrences ?? []).map((item) => ({
       startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString(),
       price: item.price === null ? null : Number(item.price), ticketUrl: item.ticketUrl ?? undefined,

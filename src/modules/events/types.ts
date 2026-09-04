@@ -6,6 +6,7 @@ export type Event = {
   imageUrl: string; city: City; venue: string; address: string; startsAt: string; timeTbd?: boolean;
   endsAt?: string; category: Category; priceMin: number | null; priceMax?: number | null;
   isFree: boolean; ageRestriction: string; ticketUrl?: string; featured?: boolean;
+  currency?: string; organizer?: { name: string; websiteUrl?: string }; canonicalSourceUrl?: string;
   occurrences?: EventOccurrence[];
   status?: "DRAFT"|"PENDING"|"PUBLISHED"|"REJECTED"|"FINISHED"|"CANCELLED";
 };

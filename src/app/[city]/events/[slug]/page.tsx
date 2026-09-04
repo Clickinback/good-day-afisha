@@ -6,18 +6,21 @@ import { notFound } from "next/navigation";
 import { EventSchedule } from "@/components/event-schedule";
 import { getPublicEvent } from "@/data/events";
 import { formatEventDate, formatEventTime, formatPrice } from "@/lib/format";
+import { buildEventStructuredData } from "@/lib/event-seo";
 
 type Props = { params: Promise<{ city: string; slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
+  const { city, slug } = await params;
   const event = await getPublicEvent(decodeURIComponent(slug));
-  return event ? {
+  if (!event || event.city.slug !== decodeURIComponent(city)) return { title: "Событие не найдено", robots: { index: false, follow: false } };
+  return {
     title: event.title,
     description: event.shortDescription,
     alternates: { canonical: `/${event.city.slug}/events/${event.slug}` },
-    openGraph: { title: event.title, description: event.shortDescription, images: [event.imageUrl] },
-  } : { title: "Событие не найдено" };
+    openGraph: { title: event.title, description: event.shortDescription, type: "article", url: `/${event.city.slug}/events/${event.slug}`, images: [{ url: event.imageUrl, alt: event.title }] },
+    twitter: { card: "summary_large_image", title: event.title, description: event.shortDescription, images: [event.imageUrl] },
+  };
 }
 
 export default async function EventPage({ params }: Props) {
@@ -27,15 +30,7 @@ export default async function EventPage({ params }: Props) {
   const event = await getPublicEvent(slug);
   if (!event || event.city.slug !== city) notFound();
 
-  const jsonLd = {
-    "@context": "https://schema.org", "@type": "Event", name: event.title,
-    description: event.shortDescription, image: [event.imageUrl], startDate: event.startsAt,
-    endDate: event.endsAt,
-    eventStatus: event.status === "CANCELLED" ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
-    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-    location: { "@type": "Place", name: event.venue, address: { "@type": "PostalAddress", streetAddress: event.address, addressLocality: event.city.name, addressCountry: "BY" } },
-    offers: { "@type": "Offer", price: event.priceMin ?? 0, priceCurrency: "BYN", url: event.ticketUrl ?? `/${city}/events/${slug}`, availability: "https://schema.org/InStock" },
-  };
+  const jsonLd = buildEventStructuredData(event);
 
   return (
     <main className="event-page">
