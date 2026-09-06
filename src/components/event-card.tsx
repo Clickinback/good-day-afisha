@@ -15,8 +15,8 @@ export function EventCard({ event, priority = false }: { event: Event; priority?
       </Link>
       <div className="event-body">
         <div className="event-meta">
-          <strong>{formatEventDate(event.startsAt)}</strong>
-          <span>{event.timeTbd ? "По согласованию" : formatEventTime(event.startsAt)}</span>
+          <strong>{formatEventDate(event.startsAt, event.city.timezone)}</strong>
+          <span>{event.timeTbd ? "По согласованию" : formatEventTime(event.startsAt, event.city.timezone)}</span>
           <span className="category-dot">{event.category.name}</span>
         </div>
         <Link href={`/${event.city.slug}/events/${event.slug}`}><h3>{event.title}</h3></Link>

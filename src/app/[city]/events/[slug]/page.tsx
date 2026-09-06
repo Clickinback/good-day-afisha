@@ -51,8 +51,8 @@ export default async function EventPage({ params }: Props) {
             <h1>{event.title}</h1>
             <p className="lead">{event.shortDescription}</p>
             <div className="facts">
-              <div><CalendarDays /><span><small>Ближайшая дата</small><b>{formatEventDate(event.startsAt)}</b></span></div>
-              <div><Clock3 /><span><small>Начало</small><b>{event.timeTbd ? "По согласованию" : formatEventTime(event.startsAt)}</b></span></div>
+              <div><CalendarDays /><span><small>Ближайшая дата</small><b>{formatEventDate(event.startsAt, event.city.timezone)}</b></span></div>
+              <div><Clock3 /><span><small>Начало</small><b>{event.timeTbd ? "По согласованию" : formatEventTime(event.startsAt, event.city.timezone)}</b></span></div>
               <div><MapPin /><span><small>Место</small><b>{event.venue}</b><a className="fact-link" href={buildMapUrl(event)} target="_blank" rel="noreferrer">{event.address}</a></span></div>
               <div><Ticket /><span><small>Стоимость</small><b>{formatPrice(event.isFree, event.priceMin, event.priceMax)}</b></span></div>
             </div>
@@ -63,7 +63,7 @@ export default async function EventPage({ params }: Props) {
             </div>
           </div>
         </div>
-        <EventSchedule occurrences={event.occurrences ?? []} isFree={event.isFree} />
+        <EventSchedule occurrences={event.occurrences ?? []} isFree={event.isFree} timezone={event.city.timezone} />
         <article className="description">
           <span className="eyebrow coral">О событии</span>
           <h2>Подробности</h2>

@@ -1,4 +1,5 @@
 import type { Event } from "@/modules/events/types";
+import { formatEventDayKey } from "./format";
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -18,8 +19,11 @@ function calendarDates(event: Event) {
   const start = new Date(event.startsAt);
   const end = event.endsAt ? new Date(event.endsAt) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
   if (event.timeTbd) {
-    const nextDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 1));
-    return { google: `${dayStamp(start)}/${dayStamp(nextDay)}`, icsStart: `DTSTART;VALUE=DATE:${dayStamp(start)}`, icsEnd: `DTEND;VALUE=DATE:${dayStamp(nextDay)}` };
+    const localDay = formatEventDayKey(event.startsAt, event.city.timezone);
+    const [year,month,day] = localDay.split("-").map(Number);
+    const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+    const startDay = localDay.replace(/-/g, "");
+    return { google: `${startDay}/${dayStamp(nextDay)}`, icsStart: `DTSTART;VALUE=DATE:${startDay}`, icsEnd: `DTEND;VALUE=DATE:${dayStamp(nextDay)}` };
   }
   return { google: `${utcStamp(start)}/${utcStamp(end)}`, icsStart: `DTSTART:${utcStamp(start)}`, icsEnd: `DTEND:${utcStamp(end)}` };
 }

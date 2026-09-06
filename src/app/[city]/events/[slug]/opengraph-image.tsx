@@ -25,7 +25,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           <div style={{ display: "flex", fontSize: 66, fontWeight: 900, lineHeight: 1.03, letterSpacing: -3, marginTop: 18 }}>{event?.title ?? "События рядом"}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 22, fontSize: 23 }}>
-          <strong style={{ display: "flex" }}>{event ? formatEventDate(event.startsAt) : "Актуальная афиша"}</strong>
+          <strong style={{ display: "flex" }}>{event ? formatEventDate(event.startsAt, event.city.timezone) : "Актуальная афиша"}</strong>
           <span style={{ display: "flex", color: "#777269" }}>·</span>
           <span style={{ display: "flex" }}>{event?.venue ?? "Полоцк и Новополоцк"}</span>
           {event && <span style={{ display: "flex", marginLeft: "auto", color: "#3561f4", fontWeight: 900 }}>{formatPrice(event.isFree, event.priceMin, event.priceMax)}</span>}

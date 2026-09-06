@@ -26,8 +26,8 @@ test("builds an escaped downloadable calendar event", () => {
 });
 
 test("builds an all-day calendar entry when time is unknown", () => {
-  const url = new URL(buildGoogleCalendarUrl({ ...event, timeTbd: true }, "https://afisha.good-day.by/event"));
-  assert.equal(url.searchParams.get("dates"), "20260920/20260921");
+  const url = new URL(buildGoogleCalendarUrl({ ...event, startsAt: "2026-09-17T21:00:00.000Z", timeTbd: true }, "https://afisha.good-day.by/event"));
+  assert.equal(url.searchParams.get("dates"), "20260918/20260919");
 });
 
 test("builds a map search from venue and address", () => {

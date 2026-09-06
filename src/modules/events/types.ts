@@ -1,4 +1,4 @@
-export type City = { slug: string; name: string; preposition: string };
+export type City = { slug: string; name: string; preposition: string; timezone?: string };
 export type Category = { slug: string; name: string; icon: string };
 export type EventOccurrence = { startsAt:string; endsAt?:string; price:number|null; ticketUrl?:string };
 export type Event = {

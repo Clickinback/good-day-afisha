@@ -38,7 +38,7 @@ export function mapEvent(row: DbEvent): Event {
     shortDescription: row.shortDescription ?? row.description ?? "Подробности события уточняются.",
     description: row.description ?? row.shortDescription ?? "Подробности события уточняются.",
     imageUrl: row.imageUrl ?? fallbackImage,
-    city: { slug: row.city.slug, name: row.city.name, preposition: preposition(row.city.name) },
+    city: { slug: row.city.slug, name: row.city.name, preposition: preposition(row.city.name), timezone: row.city.timezone },
     venue: row.venue?.name ?? "Место уточняется",
     address: row.address ?? row.venue?.address ?? "Адрес уточняется",
     startsAt: row.startsAt.toISOString(), timeTbd: row.timeTbd, endsAt: row.endsAt?.toISOString(),
@@ -60,7 +60,7 @@ export function mapEvent(row: DbEvent): Event {
 export const getPublicCity = cache(async (slug: string): Promise<City | undefined> => {
   try {
     const city = await prisma.city.findFirst({ where: { slug, active: true } });
-    return city ? { slug: city.slug, name: city.name, preposition: preposition(city.name) } : undefined;
+    return city ? { slug: city.slug, name: city.name, preposition: preposition(city.name), timezone: city.timezone } : undefined;
   } catch { return demoCity(slug); }
 });
 

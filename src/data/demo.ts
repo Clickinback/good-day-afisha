@@ -1,8 +1,8 @@
 import type { Category, City, Event } from "@/modules/events/types";
 
 export const cities: City[] = [
-  { slug: "polotsk", name: "Полоцк", preposition: "в Полоцке" },
-  { slug: "novopolotsk", name: "Новополоцк", preposition: "в Новополоцке" },
+  { slug: "polotsk", name: "Полоцк", preposition: "в Полоцке", timezone: "Europe/Minsk" },
+  { slug: "novopolotsk", name: "Новополоцк", preposition: "в Новополоцке", timezone: "Europe/Minsk" },
 ];
 
 export const categories: Category[] = [
