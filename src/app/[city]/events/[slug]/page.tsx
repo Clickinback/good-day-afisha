@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Clock3, MapPin, Ticket } from "lucide-react";
+import { ArrowLeft, CalendarDays, CalendarPlus, Clock3, Download, MapPin, Ticket } from "lucide-react";
 import { notFound } from "next/navigation";
 import { EventSchedule } from "@/components/event-schedule";
 import { getPublicEvent } from "@/data/events";
 import { formatEventDate, formatEventTime, formatPrice } from "@/lib/format";
 import { buildEventStructuredData } from "@/lib/event-seo";
+import { buildGoogleCalendarUrl, buildIcsDataUrl, buildMapUrl } from "@/lib/event-calendar";
 
 type Props = { params: Promise<{ city: string; slug: string }> };
 
@@ -31,6 +32,8 @@ export default async function EventPage({ params }: Props) {
   if (!event || event.city.slug !== city) notFound();
 
   const jsonLd = buildEventStructuredData(event);
+  const eventUrl = new URL(`/${city}/events/${event.slug}`, process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").toString();
+  const canPlan = event.status !== "CANCELLED" && event.status !== "FINISHED";
 
   return (
     <main className="event-page">
@@ -50,10 +53,14 @@ export default async function EventPage({ params }: Props) {
             <div className="facts">
               <div><CalendarDays /><span><small>Ближайшая дата</small><b>{formatEventDate(event.startsAt)}</b></span></div>
               <div><Clock3 /><span><small>Начало</small><b>{event.timeTbd ? "По согласованию" : formatEventTime(event.startsAt)}</b></span></div>
-              <div><MapPin /><span><small>Место</small><b>{event.venue}</b><em>{event.address}</em></span></div>
+              <div><MapPin /><span><small>Место</small><b>{event.venue}</b><a className="fact-link" href={buildMapUrl(event)} target="_blank" rel="noreferrer">{event.address}</a></span></div>
               <div><Ticket /><span><small>Стоимость</small><b>{formatPrice(event.isFree, event.priceMin, event.priceMax)}</b></span></div>
             </div>
-            {event.ticketUrl ? <a className="primary-button" href={event.ticketUrl}>Купить билет</a> : <span className="primary-button muted">Уточнить у организатора</span>}
+            <div className="event-actions">
+              {canPlan && event.ticketUrl ? <a className="primary-button" href={event.ticketUrl} target="_blank" rel="noreferrer"><Ticket size={18} />Купить билет</a> : canPlan && event.organizer?.websiteUrl ? <a className="primary-button" href={event.organizer.websiteUrl} target="_blank" rel="noreferrer">Уточнить у организатора</a> : null}
+              {canPlan ? <a className="secondary-button" href={buildGoogleCalendarUrl(event, eventUrl)} target="_blank" rel="noreferrer"><CalendarPlus size={18} />В Google Календарь</a> : null}
+              {canPlan ? <a className="calendar-download" href={buildIcsDataUrl(event, eventUrl)} download={`${event.slug}.ics`}><Download size={16} />Apple / Outlook</a> : null}
+            </div>
           </div>
         </div>
         <EventSchedule occurrences={event.occurrences ?? []} isFree={event.isFree} />
