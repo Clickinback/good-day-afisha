@@ -4,10 +4,12 @@ import Link from "next/link";
 import { ArrowLeft, CalendarDays, CalendarPlus, Clock3, Download, MapPin, Ticket } from "lucide-react";
 import { notFound } from "next/navigation";
 import { EventSchedule } from "@/components/event-schedule";
+import { EventShareActions } from "@/components/event-share-actions";
 import { getPublicEvent } from "@/data/events";
 import { formatEventDate, formatEventTime, formatPrice } from "@/lib/format";
 import { buildEventStructuredData } from "@/lib/event-seo";
 import { buildGoogleCalendarUrl, buildIcsDataUrl, buildMapUrl } from "@/lib/event-calendar";
+import { buildEventShareText } from "@/lib/event-sharing";
 
 type Props = { params: Promise<{ city: string; slug: string }> };
 
@@ -34,6 +36,7 @@ export default async function EventPage({ params }: Props) {
   const jsonLd = buildEventStructuredData(event);
   const eventUrl = new URL(`/${city}/events/${event.slug}`, process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").toString();
   const canPlan = event.status !== "CANCELLED" && event.status !== "FINISHED";
+  const shareText = buildEventShareText({ title: event.title, date: formatEventDate(event.startsAt, event.city.timezone), time: event.timeTbd ? undefined : formatEventTime(event.startsAt, event.city.timezone), venue: event.venue, city: event.city.name });
 
   return (
     <main className="event-page">
@@ -61,6 +64,7 @@ export default async function EventPage({ params }: Props) {
               {canPlan ? <a className="secondary-button" href={buildGoogleCalendarUrl(event, eventUrl)} target="_blank" rel="noreferrer"><CalendarPlus size={18} />В Google Календарь</a> : null}
               {canPlan ? <a className="calendar-download" href={buildIcsDataUrl(event, eventUrl)} download={`${event.slug}.ics`}><Download size={16} />Apple / Outlook</a> : null}
             </div>
+            <EventShareActions title={event.title} text={shareText} url={eventUrl} eventSlug={event.slug} city={event.city.slug} />
           </div>
         </div>
         <EventSchedule occurrences={event.occurrences ?? []} isFree={event.isFree} timezone={event.city.timezone} />
