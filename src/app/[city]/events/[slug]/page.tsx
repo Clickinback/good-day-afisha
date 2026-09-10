@@ -64,7 +64,7 @@ export default async function EventPage({ params }: Props) {
               {canPlan ? <a className="secondary-button" href={buildGoogleCalendarUrl(event, eventUrl)} target="_blank" rel="noreferrer"><CalendarPlus size={18} />В Google Календарь</a> : null}
               {canPlan ? <a className="calendar-download" href={buildIcsDataUrl(event, eventUrl)} download={`${event.slug}.ics`}><Download size={16} />Apple / Outlook</a> : null}
             </div>
-            <EventShareActions title={event.title} text={shareText} url={eventUrl} eventSlug={event.slug} city={event.city.slug} />
+            <EventShareActions title={event.title} text={shareText} url={eventUrl} eventSlug={event.slug} />
           </div>
         </div>
         <EventSchedule occurrences={event.occurrences ?? []} isFree={event.isFree} timezone={event.city.timezone} />

@@ -82,6 +82,13 @@ enum CollectionKind {
   EDITORIAL
 }
 
+enum ShareChannel {
+  NATIVE
+  TELEGRAM
+  VK
+  COPY
+}
+
 model City {
   id          String       @id @default(cuid())
   slug        String       @unique
@@ -186,10 +193,26 @@ model Event {
   publicationPolicyVersion String?
   collectionItems          CollectionEvent[]
   collectionExclusions     CollectionExclusion[]
+  shareMetrics             EventShareMetric[]
 
   @@index([cityId, status, startsAt])
   @@index([categoryId, startsAt])
   @@index([isFree, startsAt])
+}
+
+model EventShareMetric {
+  id        String       @id @default(cuid())
+  eventId   String
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  channel   ShareChannel
+  day       DateTime     @db.Date
+  count     Int          @default(1)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([eventId, channel, day])
+  @@index([day])
+  @@index([eventId, day])
 }
 
 model EventOccurrence {
