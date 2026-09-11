@@ -1,6 +1,25 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { ArrowRight, MapPin } from "lucide-react";
 import { EventGrid } from "@/components/event-grid";
 import { QuickLinks } from "@/components/quick-links";
 import { getPublicEvents } from "@/data/events";
-export default async function Home(){const featured=(await getPublicEvents()).filter(e=>e.featured||e.isFree).slice(0,3);return <main><section className="hero"><div className="shell hero-grid"><div><div className="eyebrow">Афиша двух городов</div><h1>Планы на<br/><em>хороший день.</em></h1><p>Самое интересное рядом — без десятков сайтов и бесконечного поиска.</p><div className="city-cards"><Link href="/polotsk"><MapPin/> <span><b>Полоцк</b><small>смотреть афишу</small></span><ArrowRight/></Link><Link href="/novopolotsk"><MapPin/> <span><b>Новополоцк</b><small>смотреть афишу</small></span><ArrowRight/></Link></div></div><div className="hero-poster"><span className="poster-date">АВГ<br/><b>28</b></span><div><small>СЕГОДНЯ В ГОРОДЕ</small><strong>Есть повод<br/>выйти из дома</strong></div><i>GOOD DAY</i></div></div></section><section className="shell section lift"><QuickLinks city="polotsk"/></section><section className="shell section"><div className="section-head"><div><span className="eyebrow coral">Выбор редакции</span><h2>События, которые стоит увидеть</h2></div><Link href="/polotsk">Вся афиша <ArrowRight size={18}/></Link></div><EventGrid events={featured}/></section></main>}
+import { formatPosterDate } from "@/lib/format";
+
+export default async function Home() {
+  await connection();
+  const featured = (await getPublicEvents()).filter((event) => event.featured || event.isFree).slice(0, 3);
+  const today = formatPosterDate();
+
+  return <main>
+    <section className="hero"><div className="shell hero-grid">
+      <div><div className="eyebrow">Афиша двух городов</div><h1>Планы на<br/><em>хороший день.</em></h1><p>Самое интересное рядом — без десятков сайтов и бесконечного поиска.</p><div className="city-cards">
+        <Link href="/polotsk"><MapPin/> <span><b>Полоцк</b><small>смотреть афишу</small></span><ArrowRight/></Link>
+        <Link href="/novopolotsk"><MapPin/> <span><b>Новополоцк</b><small>смотреть афишу</small></span><ArrowRight/></Link>
+      </div></div>
+      <div className="hero-poster"><span className="poster-date">{today.month}<br/><b>{today.day}</b></span><div><small>СЕГОДНЯ В ГОРОДЕ</small><strong>Есть повод<br/>выйти из дома</strong></div><i>GOOD DAY</i></div>
+    </div></section>
+    <section className="shell section lift"><QuickLinks city="polotsk"/></section>
+    <section className="shell section"><div className="section-head"><div><span className="eyebrow coral">Выбор редакции</span><h2>События, которые стоит увидеть</h2></div><Link href="/polotsk">Вся афиша <ArrowRight size={18}/></Link></div><EventGrid events={featured}/></section>
+  </main>;
+}
