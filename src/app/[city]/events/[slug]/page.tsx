@@ -5,6 +5,7 @@ import { ArrowLeft, CalendarDays, CalendarPlus, Clock3, Download, MapPin, Ticket
 import { notFound } from "next/navigation";
 import { EventSchedule } from "@/components/event-schedule";
 import { EventShareActions } from "@/components/event-share-actions";
+import { EventViewTracker, TrackedTicketLink } from "@/components/event-engagement";
 import { getPublicEvent } from "@/data/events";
 import { formatEventDate, formatEventTime, formatPrice } from "@/lib/format";
 import { buildEventStructuredData } from "@/lib/event-seo";
@@ -40,6 +41,7 @@ export default async function EventPage({ params }: Props) {
 
   return (
     <main className="event-page">
+      <EventViewTracker eventSlug={event.slug} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <div className="shell">
         <Link className="back" href={`/${city}`}><ArrowLeft size={18} />Назад к афише</Link>
@@ -60,14 +62,14 @@ export default async function EventPage({ params }: Props) {
               <div><Ticket /><span><small>Стоимость</small><b>{formatPrice(event.isFree, event.priceMin, event.priceMax)}</b></span></div>
             </div>
             <div className="event-actions">
-              {canPlan && event.ticketUrl ? <a className="primary-button" href={event.ticketUrl} target="_blank" rel="noreferrer"><Ticket size={18} />Купить билет</a> : canPlan && event.organizer?.websiteUrl ? <a className="primary-button" href={event.organizer.websiteUrl} target="_blank" rel="noreferrer">Уточнить у организатора</a> : null}
+              {canPlan && event.ticketUrl ? <TrackedTicketLink className="primary-button" eventSlug={event.slug} href={event.ticketUrl} target="_blank" rel="noreferrer"><Ticket size={18} />Купить билет</TrackedTicketLink> : canPlan && event.organizer?.websiteUrl ? <a className="primary-button" href={event.organizer.websiteUrl} target="_blank" rel="noreferrer">Уточнить у организатора</a> : null}
               {canPlan ? <a className="secondary-button" href={buildGoogleCalendarUrl(event, eventUrl)} target="_blank" rel="noreferrer"><CalendarPlus size={18} />В Google Календарь</a> : null}
               {canPlan ? <a className="calendar-download" href={buildIcsDataUrl(event, eventUrl)} download={`${event.slug}.ics`}><Download size={16} />Apple / Outlook</a> : null}
             </div>
             <EventShareActions title={event.title} text={shareText} url={eventUrl} eventSlug={event.slug} />
           </div>
         </div>
-        <EventSchedule occurrences={event.occurrences ?? []} isFree={event.isFree} timezone={event.city.timezone} />
+        <EventSchedule eventSlug={event.slug} occurrences={event.occurrences ?? []} isFree={event.isFree} timezone={event.city.timezone} />
         <article className="description">
           <span className="eyebrow coral">О событии</span>
           <h2>Подробности</h2>

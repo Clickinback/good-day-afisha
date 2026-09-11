@@ -89,6 +89,11 @@ enum ShareChannel {
   COPY
 }
 
+enum EngagementAction {
+  VIEW
+  TICKET
+}
+
 model City {
   id          String       @id @default(cuid())
   slug        String       @unique
@@ -194,6 +199,7 @@ model Event {
   collectionItems          CollectionEvent[]
   collectionExclusions     CollectionExclusion[]
   shareMetrics             EventShareMetric[]
+  engagementMetrics        EventEngagementMetric[]
 
   @@index([cityId, status, startsAt])
   @@index([categoryId, startsAt])
@@ -211,6 +217,21 @@ model EventShareMetric {
   updatedAt DateTime     @updatedAt
 
   @@unique([eventId, channel, day])
+  @@index([day])
+  @@index([eventId, day])
+}
+
+model EventEngagementMetric {
+  id        String           @id @default(cuid())
+  eventId   String
+  event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  action    EngagementAction
+  day       DateTime         @db.Date
+  count     Int              @default(1)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([eventId, action, day])
   @@index([day])
   @@index([eventId, day])
 }
