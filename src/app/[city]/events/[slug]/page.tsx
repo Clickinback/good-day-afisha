@@ -47,7 +47,7 @@ export default async function EventPage({ params }: Props) {
         <Link className="back" href={`/${city}`}><ArrowLeft size={18} />Назад к афише</Link>
         <div className="event-detail">
           <div className="detail-image">
-            <Image src={event.imageUrl} alt={event.title} fill priority sizes="(max-width: 900px) 100vw, 55vw" />
+            <Image src={event.imageUrl} alt={event.title} fill priority sizes="(max-width: 600px) 100vw, (max-width: 900px) 560px, 38vw" />
             <span>{event.category.name}</span>
           </div>
           <div className="detail-copy">
