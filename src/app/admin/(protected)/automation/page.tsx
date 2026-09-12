@@ -2,6 +2,7 @@ import { Activity, AlertTriangle, Bot, CheckCircle2, Clock3, Database, Radio, XC
 import { runAutomationNow } from "@/app/admin/automation-actions";
 import { AutomationRunButton } from "@/components/admin/automation-run-button";
 import { prisma } from "@/lib/prisma";
+import { estimateOpenAiCost, formatEstimatedUsd, formatTokenCount, openAiPricingFromEnv, openAiUsageWindows, type TokenUsage } from "@/lib/openai-usage";
 
 type Step = {
   name: string;
@@ -18,6 +19,7 @@ type Run = {
   finishedAt: Date | null;
   steps: unknown;
   errorMessage: string | null;
+  serverNow: Date;
 };
 
 const stepNames: Record<string, string> = {
@@ -56,11 +58,27 @@ export default async function AutomationPage() {
   let runs: Run[] = [];
   let dbConnected = true;
   let activeSources = 0;
+  const usageWindows = openAiUsageWindows();
+  let tokenUsage: Record<"today" | "sevenDays" | "thirtyDays", TokenUsage> = {
+    today: { input: 0, output: 0 },
+    sevenDays: { input: 0, output: 0 },
+    thirtyDays: { input: 0, output: 0 },
+  };
   try {
-    [runs, activeSources] = await Promise.all([
-      prisma.$queryRawUnsafe<Run[]>('SELECT "id", "status", "trigger", "startedAt", "finishedAt", "steps", "errorMessage" FROM "AutomationRun" ORDER BY "startedAt" DESC LIMIT 30'),
+    const [recentRuns, sourceCount, today, sevenDays, thirtyDays] = await Promise.all([
+      prisma.$queryRawUnsafe<Run[]>('SELECT "id", "status", "trigger", "startedAt", "finishedAt", "steps", "errorMessage", NOW() AS "serverNow" FROM "AutomationRun" ORDER BY "startedAt" DESC LIMIT 30'),
       prisma.source.count({ where: { active: true } }),
+      prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.today } }, _sum: { inputTokens: true, outputTokens: true } }),
+      prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.sevenDays } }, _sum: { inputTokens: true, outputTokens: true } }),
+      prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.thirtyDays } }, _sum: { inputTokens: true, outputTokens: true } }),
     ]);
+    runs = recentRuns;
+    activeSources = sourceCount;
+    tokenUsage = {
+      today: { input: today._sum.inputTokens ?? 0, output: today._sum.outputTokens ?? 0 },
+      sevenDays: { input: sevenDays._sum.inputTokens ?? 0, output: sevenDays._sum.outputTokens ?? 0 },
+      thirtyDays: { input: thirtyDays._sum.inputTokens ?? 0, output: thirtyDays._sum.outputTokens ?? 0 },
+    };
   } catch {
     dbConnected = false;
   }
@@ -71,10 +89,19 @@ export default async function AutomationPage() {
   const parser = lastSteps.find((step) => step.name === "processRawEvents");
   const publication = lastSteps.find((step) => step.name === "publishEvents");
   const collections = lastSteps.find((step) => step.name === "generateCollections");
-  const intervalMinutes = 30;
+  const configuredIntervalSeconds = Number(process.env.PIPELINE_INTERVAL_SECONDS ?? 3600);
+  const intervalMinutes = Number.isFinite(configuredIntervalSeconds) && configuredIntervalSeconds > 0
+    ? Math.max(1, Math.round(configuredIntervalSeconds / 60))
+    : 60;
   const nextExpected = last ? new Date(last.startedAt.getTime() + intervalMinutes * 60_000) : null;
-  const stale = !last || Date.now() - last.startedAt.getTime() > intervalMinutes * 2.5 * 60_000;
+  const stale = !last || last.serverNow.getTime() - last.startedAt.getTime() > intervalMinutes * 2.5 * 60_000;
   const aiConfigured = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_EVENT_PARSER_MODEL);
+  const pricing = openAiPricingFromEnv();
+  const usagePeriods = [
+    { key: "today" as const, label: "Сегодня" },
+    { key: "sevenDays" as const, label: "7 дней" },
+    { key: "thirtyDays" as const, label: "30 дней" },
+  ];
   const warnings = [
     !dbConnected ? "PostgreSQL недоступен. Проверьте Docker Desktop и DATABASE_URL." : null,
     dbConnected && activeSources === 0 ? "Нет активных источников для автоматического сбора." : null,
@@ -121,6 +148,28 @@ export default async function AutomationPage() {
         <div><span>Опубликовано</span><b>{numberFrom(publication, "published")}</b></div>
         <div><span>Событий в подборках</span><b>{numberFrom(collections, "events")}</b></div>
       </section>}
+
+      <section className="admin-card ai-usage">
+        <header>
+          <div><span className="eyebrow coral">OpenAI usage</span><h2>Расход токенов</h2></div>
+          <p>Модель: <b>{process.env.OPENAI_EVENT_PARSER_MODEL || "не настроена"}</b></p>
+        </header>
+        <div className="ai-usage-grid">
+          {usagePeriods.map(({ key, label }) => {
+            const usage = tokenUsage[key];
+            const total = usage.input + usage.output;
+            return <div key={key}>
+              <span>{label}</span>
+              <b>{formatTokenCount(total)}</b>
+              <small>вход: {formatTokenCount(usage.input)} · выход: {formatTokenCount(usage.output)}</small>
+              <strong>{formatEstimatedUsd(estimateOpenAiCost(usage, pricing))}</strong>
+            </div>;
+          })}
+        </div>
+        <footer>{pricing
+          ? "Стоимость приблизительная и рассчитана по тарифам, заданным для текущей модели."
+          : "Для оценки стоимости задайте тарифы текущей модели за 1 млн входных и выходных токенов. Фактические токены уже учитываются."}</footer>
+      </section>
 
       <section className="automation-runs">
         <div className="table-toolbar"><b>Последние запуски</b><span>каждые {intervalMinutes} минут</span></div>
