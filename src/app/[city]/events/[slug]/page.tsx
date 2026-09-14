@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, CalendarPlus, Clock3, Download, MapPin, Ticket } from "lucide-react";
 import { notFound } from "next/navigation";
 import { EventSchedule } from "@/components/event-schedule";
+import { EventDetailMedia } from "@/components/event-detail-media";
 import { EventShareActions } from "@/components/event-share-actions";
 import { EventViewTracker, TrackedTicketLink } from "@/components/event-engagement";
 import { getPublicEvent } from "@/data/events";
@@ -46,10 +46,7 @@ export default async function EventPage({ params }: Props) {
       <div className="shell">
         <Link className="back" href={`/${city}`}><ArrowLeft size={18} />Назад к афише</Link>
         <div className="event-detail">
-          <div className="detail-image">
-            <Image src={event.imageUrl} alt={event.title} fill priority sizes="(max-width: 600px) 100vw, (max-width: 900px) 560px, 38vw" />
-            <span>{event.category.name}</span>
-          </div>
+          <EventDetailMedia src={event.imageUrl} alt={event.title} category={event.category.name} />
           <div className="detail-copy">
             {event.status === "CANCELLED" ? <div className="event-status">Событие отменено организатором</div> : event.status === "FINISHED" ? <div className="event-status finished">Событие завершено — страница сохранена в архиве</div> : null}
             <div className="eyebrow">{event.city.name}{event.ageRestriction !== "Возраст уточняется" ? ` · ${event.ageRestriction}` : ""}</div>

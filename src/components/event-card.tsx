@@ -9,7 +9,8 @@ export function EventCard({ event, priority = false }: { event: Event; priority?
   return (
     <article className="event-card">
       <Link href={`/${event.city.slug}/events/${event.slug}`} className="event-image">
-        <Image src={event.imageUrl} alt="" fill sizes="(max-width: 600px) 92vw, (max-width: 900px) 45vw, (max-width: 1100px) 31vw, 24vw" priority={priority} />
+        <Image className="event-image-backdrop" src={event.imageUrl} alt="" aria-hidden fill sizes="(max-width: 600px) 92vw, (max-width: 900px) 45vw, (max-width: 1100px) 31vw, 24vw" priority={priority} />
+        <Image className="event-image-foreground" src={event.imageUrl} alt="" fill sizes="(max-width: 600px) 92vw, (max-width: 900px) 45vw, (max-width: 1100px) 31vw, 24vw" priority={priority} />
         <span className={`price ${event.isFree ? "free" : ""}`}>{formatPrice(event.isFree, event.priceMin, event.priceMax)}</span>
         {event.ageRestriction !== "Возраст уточняется" && <span className="age">{event.ageRestriction}</span>}
       </Link>

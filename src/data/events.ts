@@ -1,9 +1,10 @@
-import { endOfDay, endOfWeek, isWithinInterval, startOfDay, startOfTomorrow } from "date-fns";
+import { isWithinInterval } from "date-fns";
 import type { Prisma } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { cities, events } from "./demo";
 import type { City, Event, EventFilters } from "@/modules/events/types";
+import { eventPeriodRange } from "@/lib/event-period";
 
 const fallbackImage = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1400&q=80";
 const eventInclude = { city: true, venue: true, category: true, organizer: true, occurrences: { orderBy: { startsAt: "asc" as const } } };
@@ -18,6 +19,7 @@ const demoEvent = (slug: string) => events.find((event) => event.slug === slug);
 
 function filterDemo(filters: EventFilters = {}) {
   const now = new Date();
+  const range = eventPeriodRange(filters.period, now);
   return events.filter((event) => {
     const date = new Date(event.startsAt);
     if (filters.city && event.city.slug !== filters.city) return false;
@@ -25,14 +27,16 @@ function filterDemo(filters: EventFilters = {}) {
     if (filters.free && !event.isFree) return false;
     if (filters.kids && event.category.slug !== "kids" && event.ageRestriction !== "0+") return false;
     if (filters.q && !`${event.title} ${event.venue} ${event.shortDescription}`.toLowerCase().includes(filters.q.toLowerCase())) return false;
-    if (filters.period === "today" && !isWithinInterval(date, { start: startOfDay(now), end: endOfDay(now) })) return false;
-    if (filters.period === "tomorrow" && !isWithinInterval(date, { start: startOfTomorrow(), end: endOfDay(startOfTomorrow()) })) return false;
-    if (filters.period === "weekend" && !isWithinInterval(date, { start: now, end: endOfWeek(now, { weekStartsOn: 1 }) })) return false;
+    if (filters.period && range.to && !isWithinInterval(date, { start: range.from, end: range.to })) return false;
     return true;
   }).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
 }
 
-export function mapEvent(row: DbEvent): Event {
+type OccurrenceWindow={from:Date;to?:Date};
+
+export function mapEvent(row: DbEvent,window:OccurrenceWindow={from:new Date()}): Event {
+  const occurrences=(row.occurrences??[]).filter(item=>item.startsAt>=window.from&&(!window.to||item.startsAt<=window.to));
+  const primaryOccurrence=occurrences[0];
   return {
     id: row.id, slug: row.slug, title: row.title,
     shortDescription: row.shortDescription ?? row.description ?? "Подробности события уточняются.",
@@ -41,16 +45,16 @@ export function mapEvent(row: DbEvent): Event {
     city: { slug: row.city.slug, name: row.city.name, preposition: preposition(row.city.name), timezone: row.city.timezone },
     venue: row.venue?.name ?? "Место уточняется",
     address: row.address ?? row.venue?.address ?? "Адрес уточняется",
-    startsAt: row.startsAt.toISOString(), timeTbd: row.timeTbd, endsAt: row.endsAt?.toISOString(),
+    startsAt: (primaryOccurrence?.startsAt??row.startsAt).toISOString(), timeTbd: row.timeTbd, endsAt: (primaryOccurrence?.endsAt??row.endsAt)?.toISOString(),
     category: { slug: row.category.slug, name: row.category.name, icon: row.category.icon ?? "calendar" },
     priceMin: row.priceMin === null ? null : Number(row.priceMin),
     priceMax: row.priceMax === null ? null : Number(row.priceMax),
     isFree: row.isFree, ageRestriction: row.ageRestriction ?? "Возраст уточняется",
-    ticketUrl: row.ticketUrl ?? undefined, featured: row.isFeatured, status: row.status,
+    ticketUrl: primaryOccurrence?.ticketUrl??row.ticketUrl??undefined, featured: row.isFeatured, status: row.status,
     currency: row.currency,
     organizer: row.organizer ? { name: row.organizer.name, websiteUrl: row.organizer.websiteUrl ?? undefined } : undefined,
     canonicalSourceUrl: row.canonicalSourceUrl ?? undefined,
-    occurrences: (row.occurrences ?? []).map((item) => ({
+    occurrences: occurrences.map((item) => ({
       startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString(),
       price: item.price === null ? null : Number(item.price), ticketUrl: item.ticketUrl ?? undefined,
     })),
@@ -66,30 +70,28 @@ export const getPublicCity = cache(async (slug: string): Promise<City | undefine
 
 export async function getPublicEvents(filters: EventFilters = {}): Promise<Event[]> {
   const now = new Date();
-  let from = now;
-  if (filters.period === "today") from = startOfDay(now);
-  if (filters.period === "tomorrow") from = startOfTomorrow();
-  let to: Date | undefined;
-  if (filters.period === "today") to = endOfDay(now);
-  if (filters.period === "tomorrow") to = endOfDay(startOfTomorrow());
-  if (filters.period === "weekend") to = endOfWeek(now, { weekStartsOn: 1 });
+  const {from,to}=eventPeriodRange(filters.period,now);
+  const occurrenceRange={gte:from,...(to?{lte:to}:{})};
   try {
     const rows = await prisma.event.findMany({
       where: {
-        status: "PUBLISHED", startsAt: { gte: from, ...(to ? { lte: to } : {}) },
+        status: "PUBLISHED",
         ...(filters.city ? { city: { slug: filters.city } } : {}),
         ...(filters.category ? { category: { slug: filters.category } } : {}),
         ...(filters.free ? { isFree: true } : {}),
-        ...(filters.kids ? { OR: [{ category: { slug: "kids" } }, { ageRestriction: "0+" }] } : {}),
-        ...(filters.q ? { OR: [
-          { title: { contains: filters.q, mode: "insensitive" as const } },
-          { description: { contains: filters.q, mode: "insensitive" as const } },
-          { venue: { name: { contains: filters.q, mode: "insensitive" as const } } },
-        ] } : {}),
+        AND: [
+          {OR:[{startsAt:occurrenceRange},{occurrences:{some:{startsAt:occurrenceRange}}}]},
+          ...(filters.kids?[{OR:[{category:{slug:"kids"}},{ageRestriction:"0+"}]}]:[]),
+          ...(filters.q?[{OR:[
+            {title:{contains:filters.q,mode:"insensitive" as const}},
+            {description:{contains:filters.q,mode:"insensitive" as const}},
+            {venue:{name:{contains:filters.q,mode:"insensitive" as const}}},
+          ]}]:[]),
+        ],
       },
       include: eventInclude, orderBy: { startsAt: "asc" }, take: 200,
     });
-    return rows.map(mapEvent);
+    return rows.map(row=>mapEvent(row,{from,to})).sort((a,b)=>+new Date(a.startsAt)-+new Date(b.startsAt));
   } catch { return filterDemo(filters); }
 }
 
@@ -99,7 +101,7 @@ export const getPublicEvent = cache(async (slug: string): Promise<Event | undefi
       where: { slug, status: { in: ["PUBLISHED", "FINISHED", "CANCELLED"] } },
       include: eventInclude,
     });
-    return row ? mapEvent(row) : undefined;
+    return row ? mapEvent(row,{from:new Date()}) : undefined;
   } catch { return demoEvent(slug); }
 });
 
