@@ -9,7 +9,7 @@ const contentTypes:Record<string,string>={"image/jpeg":"jpg","image/png":"png","
 export function isPersistableImageUrl(value:string){try{const url=new URL(value);return url.protocol==="https:"&&(/^cdn\d*\.telesco\.pe$/i.test(url.hostname)||(url.hostname==="hubl.by"&&url.pathname.startsWith("/storage/")))}catch{return false}}
 export const extensionForContentType=(value:string)=>contentTypes[value.split(";")[0].trim().toLowerCase()]??null;
 
-export async function persistCollectedImage(value:string){
+export async function persistCollectedImage(value:string,variant?:"poster"){
   if(!isPersistableImageUrl(value))return null;
   const url=await assertSafeUrl(value);
   const response=await fetch(url,{redirect:"error",signal:AbortSignal.timeout(15_000),headers:{"user-agent":process.env.COLLECTOR_USER_AGENT??"GoodDayAfishaBot/0.1","accept":"image/jpeg,image/png,image/webp,image/gif"}});
@@ -22,7 +22,7 @@ export async function persistCollectedImage(value:string){
   if(bytes.byteLength>MAX_IMAGE_BYTES)throw new Error("Изображение превышает 8 МБ");
   const hash=createHash("sha256").update(bytes).digest("hex");
   const directory=path.join(process.cwd(),"public","media","events");
-  const filename=`${hash}.${extension}`;
+  const filename=`${variant?`${variant}-`:""}${hash}.${extension}`;
   const target=path.join(directory,filename);
   const temporary=path.join(directory,`.${hash}-${process.pid}.tmp`);
   await mkdir(directory,{recursive:true});
