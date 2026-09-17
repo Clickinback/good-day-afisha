@@ -1,13 +1,12 @@
 import { Prisma } from "@prisma/client";
-import { fromZonedTime } from "date-fns-tz";
 import { prisma } from "@/lib/prisma";
 import { parsedEventSchema,type ParsedEvent } from "@/modules/ai-parser/schema";
 import { recordSystemError } from "@/modules/collectors/errors";
 import { deduplicationConfig } from "./config";
+import { localEventDate } from "./date";
 import { normalize,scoreEvents } from "./similarity";
 
 export type DeduplicationResult={rawEventId:string;decision:"MATCHED"|"MODERATION"|"CREATED"|"SKIPPED";eventId?:string;score?:number;reason?:string};
-const localDate=(date:string,time:string|null,timezone:string)=>fromZonedTime(`${date}T${time??"00:00"}:00`,timezone);
 
 async function findCity(parsed:ParsedEvent,sourceCityId:string|null){
   if(sourceCityId)return prisma.city.findUnique({where:{id:sourceCityId}});
@@ -33,8 +32,9 @@ async function createEventFromRaw(rawId:string){
   if(!city)return null;
   const category=await prisma.category.findUnique({where:{slug:parsed.category??"other"}})??await prisma.category.findUnique({where:{slug:"other"}});
   if(!category)return null;
-  const startsAt=localDate(startDate,parsed.startTime,city.timezone);
-  const endsAt=parsed.endDate?localDate(parsed.endDate,parsed.endTime,city.timezone):null;
+  const startsAt=localEventDate(startDate,parsed.startTime,city.timezone);
+  const endsAt=parsed.endDate?localEventDate(parsed.endDate,parsed.endTime,city.timezone):null;
+  if(!startsAt||(parsed.endDate&&!endsAt))return null;
   const slug=await uniqueSlug(title);
   return prisma.$transaction(async tx=>{
     const event=await tx.event.create({data:{slug,title,shortDescription:parsed.description?.slice(0,280),description:parsed.description,imageUrl:raw.imageUrl,cityId:city.id,address:parsed.address,startsAt,timeTbd:parsed.timeTbd,endsAt,categoryId:category.id,priceMin:parsed.priceMin,priceMax:parsed.priceMax,isFree:parsed.isFree??false,ageRestriction:parsed.ageRestriction,ticketUrl:parsed.ticketUrl,canonicalSourceUrl:raw.url,status:"PENDING",confidence:parsed.confidence,additionMethod:"AUTOMATIC",moderationStatus:"PENDING"}});
@@ -54,7 +54,13 @@ export async function deduplicateRawEvent(rawEventId:string):Promise<Deduplicati
   const title=parsed.title;
   const city=await findCity(parsed,raw.source.cityId);
   if(!city)return {rawEventId,decision:"SKIPPED",reason:"Город не определён"};
-  const startsAt=localDate(parsed.startDate,parsed.startTime,city.timezone);
+  const startsAt=localEventDate(parsed.startDate,parsed.startTime,city.timezone);
+  if(!startsAt||(parsed.endDate&&!localEventDate(parsed.endDate,parsed.endTime,city.timezone))){
+    const reason="Некорректная дата или время в parsedData";
+    await prisma.rawEvent.update({where:{id:rawEventId},data:{processingStatus:"FAILED",processingError:reason}});
+    await recordSystemError("deduplication","validateDate",new Error(reason),{rawEventId});
+    return {rawEventId,decision:"SKIPPED",reason};
+  }
   const window=deduplicationConfig.candidateWindowHours*3600_000;
   const candidates=await prisma.event.findMany({where:{cityId:city.id,startsAt:{gte:new Date(+startsAt-window),lte:new Date(+startsAt+window)},status:{notIn:["REJECTED","CANCELLED"]}},include:{city:true,venue:true,organizer:true},take:deduplicationConfig.maxCandidates});
   const scored=candidates.map(event=>({event,breakdown:scoreEvents({title,startsAt,city:city.name,venue:parsed.venue,organizer:parsed.organizer},{title:event.title,startsAt:event.startsAt,city:event.city.name,venue:event.venue?.name,organizer:event.organizer?.name})})).sort((a,b)=>b.breakdown.total-a.breakdown.total);
@@ -79,7 +85,13 @@ export async function deduplicateRawEvent(rawEventId:string):Promise<Deduplicati
 export async function deduplicateBatch(limit=20){
   const rows=await prisma.rawEvent.findMany({where:{processingStatus:"PROCESSED",eventSources:{none:{}},duplicateCandidates:{none:{}}},select:{id:true},orderBy:{processedAt:"asc"},take:Math.min(Math.max(limit,1),100)});
   const results:DeduplicationResult[]=[];
-  for(const row of rows)results.push(await deduplicateRawEvent(row.id));
+  for(const row of rows){
+    try{results.push(await deduplicateRawEvent(row.id))}
+    catch(error){
+      await recordSystemError("deduplication","deduplicateRawEvent",error,{rawEventId:row.id});
+      results.push({rawEventId:row.id,decision:"SKIPPED",reason:error instanceof Error?error.message:String(error)});
+    }
+  }
   return results;
 }
 

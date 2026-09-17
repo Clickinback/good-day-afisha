@@ -50,6 +50,26 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 docker image prune -f
 ```
 
+### Постеры и постоянное хранилище
+
+Собранные изображения записываются приложением в `/app/public/media/events` и отдаются
+через маршрут `/media/events/<имя файла>`. Каталог **обязательно** должен быть постоянным:
+в штатном Compose он привязан к `./public/media` на хосте. Если запуск использует
+дополнительный Compose override, проверьте итоговую конфигурацию и mount контейнера
+перед пересозданием `app`:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml config
+docker inspect afisha-app --format '{{json .Mounts}}'
+```
+
+Убедитесь, что `/app/public/media` указывает на каталог проекта с существующими
+изображениями и входит в резервную копию. Не запускайте пересборку без этого mount:
+файлы, оставшиеся только в файловой системе контейнера, пропадут. Если старые URL
+уже отвечают 404, после восстановления mount выполните один контрольный сбор
+источника: коллектор повторно скачает отсутствующие изображения. Проверяйте
+конкретный URL `/media/events/...` на ответ 200 и `Content-Type: image/*`.
+
 ## Журналы
 
 ```bash

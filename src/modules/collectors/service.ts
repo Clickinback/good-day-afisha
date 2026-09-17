@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { assertRobotsAllowed,safeFetchPage } from "./http";
 import { collectorFor } from "./registry";
 import { recordSystemError } from "./errors";
-import { persistCollectedImage } from "./image-storage";
+import { persistCollectedImage,storedImageExists } from "./image-storage";
 import { syncScreeningsForRaw } from "./screenings";
 import type { WebsiteConfig } from "./types";
 import { extractCinemaPoster } from "./cinema-poster";
@@ -26,11 +26,11 @@ export async function collectSource(sourceId:string):Promise<CollectionResult>{
       try{
         const existing=await existingRaw(source.id,item.externalId,item.url);
         if(existing&&config.syncScreenings)await syncScreeningsForRaw(existing.id,item.url,safeFetchPage);
-        if(existing?.imageUrl?.startsWith("/media/events/")){skipped++;continue}
+        if(existing?.imageUrl?.startsWith("/media/events/")&&await storedImageExists(existing.imageUrl)){skipped++;continue}
         let storedImage:string|null=null;
         let imageUrl=item.imageUrl;
         let poster=false;
-        if(!existing&&config.syncScreenings){
+        if(config.syncScreenings){
           try{
             const page=await safeFetchPage(item.url);
             const candidate=extractCinemaPoster(page.html,page.url);

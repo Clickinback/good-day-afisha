@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { extractJsonLdEvents } from "./website";
 import type { FetchPageResult } from "./types";
 import { extractCinemaPoster } from "./cinema-poster";
-import { persistCollectedImage } from "./image-storage";
+import { persistCollectedImage,storedImageExists } from "./image-storage";
 import { recordSystemError } from "./errors";
 
 type Screening={startsAt:Date;price:number|null;ticketUrl:string|null;externalId:string};
@@ -15,7 +15,8 @@ export async function syncScreeningsForRaw(rawEventId:string,url:string,fetchPag
   const link=await prisma.eventSource.findFirst({where:{rawEventId},select:{eventId:true,event:{select:{status:true,imageUrl:true}}}});
   if(!link)return 0;
   const page=await fetchPage(url);
-  const posterUrl=link.event.imageUrl?.startsWith("/media/events/poster-")?undefined:extractCinemaPoster(page.html,page.url);
+  const hasPoster=Boolean(link.event.imageUrl?.startsWith("/media/events/poster-")&&await storedImageExists(link.event.imageUrl));
+  const posterUrl=hasPoster?undefined:extractCinemaPoster(page.html,page.url);
   if(posterUrl){
     try{
       const imageUrl=await persistCollectedImage(posterUrl,"poster");
