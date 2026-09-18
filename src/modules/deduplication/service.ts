@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { parsedEventSchema,type ParsedEvent } from "@/modules/ai-parser/schema";
 import { recordSystemError } from "@/modules/collectors/errors";
 import { deduplicationConfig } from "./config";
+import { isHublCinemaVariant } from "./cinema-identity";
 import { localEventDate } from "./date";
 import { normalize,scoreEvents } from "./similarity";
 
@@ -77,6 +78,24 @@ export async function deduplicateRawEvent(rawEventId:string):Promise<Deduplicati
   if(ambiguous.length){
     await prisma.duplicateCandidate.createMany({data:ambiguous.map(item=>({rawEventId,eventId:item.event.id,score:item.breakdown.total,breakdown:item.breakdown as unknown as Prisma.InputJsonValue,status:"PENDING"})),skipDuplicates:true});
     return {rawEventId,decision:"MODERATION",eventId:ambiguous[0].event.id,score:ambiguous[0].breakdown.total};
+  }
+  // HUBL can assign new URL suffixes to the same film after its first screenings.
+  // Dates can be weeks apart, so send matching titles/film paths to review instead of creating another Event.
+  if(raw.source.type==="WEBSITE"&&parsed.category==="cinema"){
+    const cinemaCandidates=await prisma.event.findMany({
+      where:{cityId:city.id,title:{equals:title,mode:"insensitive"},category:{slug:"cinema"},status:{notIn:["REJECTED","CANCELLED"]},sources:{some:{sourceId:raw.sourceId}}},
+      include:{city:true,venue:true,organizer:true,sources:{where:{sourceId:raw.sourceId},select:{sourceUrl:true}}},
+      orderBy:{updatedAt:"desc"},take:deduplicationConfig.maxCandidates,
+    });
+    const variants=cinemaCandidates.filter(event=>event.sources.some(source=>isHublCinemaVariant({title,url:raw.url},{title:event.title,url:source.sourceUrl}))).slice(0,3);
+    if(variants.length){
+      const scoredVariants=variants.map(event=>{
+        const breakdown=scoreEvents({title,startsAt,city:city.name,venue:parsed.venue,organizer:parsed.organizer},{title:event.title,startsAt:event.startsAt,city:event.city.name,venue:event.venue?.name,organizer:event.organizer?.name});
+        return {event,breakdown};
+      });
+      await prisma.duplicateCandidate.createMany({data:scoredVariants.map(item=>({rawEventId,eventId:item.event.id,score:item.breakdown.total,breakdown:{...item.breakdown,identity:"hubl-cinema-url-variant"},status:"PENDING"})),skipDuplicates:true});
+      return {rawEventId,decision:"MODERATION",eventId:scoredVariants[0].event.id,score:scoredVariants[0].breakdown.total};
+    }
   }
   const event=await createEventFromRaw(rawEventId);
   return event?{rawEventId,decision:"CREATED",eventId:event.id}:{rawEventId,decision:"SKIPPED",reason:"Не удалось создать Event"};
