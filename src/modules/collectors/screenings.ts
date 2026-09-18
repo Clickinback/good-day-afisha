@@ -37,7 +37,7 @@ export function screeningFromListing(item:CollectedItem):Screening|null{
 }
 
 export async function syncScreeningsForRaw(rawEventId:string,url:string,fetchPage:(url:string)=>Promise<FetchPageResult>,listingItem?:CollectedItem){
-  const link=await prisma.eventSource.findFirst({where:{rawEventId},select:{eventId:true,event:{select:{status:true,imageUrl:true}}}});
+  const link=await prisma.eventSource.findFirst({where:{rawEventId},select:{eventId:true,event:{select:{title:true,status:true,imageUrl:true}}}});
   if(!link)return 0;
   const page=await fetchPage(url);
   const hasPoster=Boolean(link.event.imageUrl?.startsWith("/media/events/poster-")&&await storedImageExists(link.event.imageUrl));
@@ -54,8 +54,9 @@ export async function syncScreeningsForRaw(rawEventId:string,url:string,fetchPag
   const detailScreenings=parseScreenings(page.html,page.url);
   const listingScreening=listingItem?screeningFromListing(listingItem):null;
   const screenings=(detailScreenings.length?detailScreenings:listingScreening?[listingScreening]:[]).sort((a,b)=>+a.startsAt-+b.startsAt);
-  if(!screenings.length){console.warn("[collector:screenings] no showtimes extracted",{rawEventId,url});return 0}
-  if(!detailScreenings.length)console.info("[collector:screenings] listing showtime used",{rawEventId,url});
+  const strategy=detailScreenings.length?"detail-json-ld":listingScreening?"listing-json-ld":"none";
+  console.info("[collector:screenings] parsed",{rawEventId,title:link.event.title,url,strategy,showtimes:screenings.length,futureShowtimes:screenings.filter(item=>item.startsAt>=new Date()).length});
+  if(!screenings.length)return 0;
   const externalIds=screenings.map(item=>item.externalId);
   await prisma.$transaction(async tx=>{
     for(const item of screenings)await tx.eventOccurrence.upsert({where:{eventId_startsAt:{eventId:link.eventId,startsAt:item.startsAt}},update:{price:item.price,ticketUrl:item.ticketUrl,externalId:item.externalId},create:{eventId:link.eventId,startsAt:item.startsAt,price:item.price,ticketUrl:item.ticketUrl,externalId:item.externalId}});
