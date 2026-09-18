@@ -7,3 +7,8 @@ test("auto-publishes high confidence official data",()=>assert.equal(calculatePu
 test("sends an uncertain source to moderation",()=>assert.equal(calculatePublicationConfidence({aiConfidence:.9,sourceTrustScores:[.4],quality:{...complete,hasImage:false,hasTicket:false}}).decision,"MODERATION"));
 test("holds incomplete low-confidence data",()=>assert.equal(calculatePublicationConfidence({aiConfidence:.55,sourceTrustScores:[.3],quality:{...complete,hasDescription:false,hasImage:false,hasLocation:false,hasPrice:false,hasAge:false,hasTicket:false,hasOrganizer:false,hasEnd:false}}).decision,"HOLD"));
 test("adds bounded corroboration bonus",()=>{const one=calculatePublicationConfidence({aiConfidence:.7,sourceTrustScores:[.7],quality:complete});const many=calculatePublicationConfidence({aiConfidence:.7,sourceTrustScores:[.7,.6,.5,.4],quality:complete});assert.equal(many.corroborationBonus,.08);assert.ok(many.total>one.total)});
+test("a source-specific threshold never lowers the default threshold for other events",()=>{
+  const input={aiConfidence:.85,sourceTrustScores:[.8],quality:complete};
+  assert.equal(calculatePublicationConfidence(input).decision,"MODERATION");
+  assert.equal(calculatePublicationConfidence({...input,autoPublishThreshold:.65}).decision,"AUTO_PUBLISH");
+});

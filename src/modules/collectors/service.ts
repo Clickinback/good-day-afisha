@@ -25,7 +25,7 @@ export async function collectSource(sourceId:string):Promise<CollectionResult>{
     for(const item of items){
       try{
         const existing=await existingRaw(source.id,item.externalId,item.url);
-        if(existing&&config.syncScreenings)await syncScreeningsForRaw(existing.id,item.url,safeFetchPage);
+        if(existing&&config.syncScreenings)await syncScreeningsForRaw(existing.id,item.url,safeFetchPage,item);
         if(existing?.imageUrl?.startsWith("/media/events/")&&await storedImageExists(existing.imageUrl)){skipped++;continue}
         let storedImage:string|null=null;
         let imageUrl=item.imageUrl;
