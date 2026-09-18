@@ -15,10 +15,11 @@ export function extractCinemaPoster(html: string, pageUrl: string): string | und
     const portrait = width > 0 && height > width * 1.15;
     const posterHint = /poster/i.test(`${image.attr("class") ?? ""} ${image.attr("src") ?? ""}`);
     if (!portrait && !(posterHint && !(width > 0 && height > 0 && width >= height))) continue;
-    const value = image.attr("src") ?? image.attr("data-src");
-    if (!value) continue;
-    const url = new URL(value, pageUrl).toString();
-    if (isPersistableImageUrl(url)) return url;
+    for (const value of [image.attr("data-src"), image.attr("src")]) {
+      if (!value) continue;
+      const url = new URL(value, pageUrl).toString();
+      if (isPersistableImageUrl(url)) return url;
+    }
   }
   return undefined;
 }

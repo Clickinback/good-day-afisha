@@ -5,7 +5,7 @@ import { recordSystemError } from "./errors";
 import { persistCollectedImage,storedImageExists } from "./image-storage";
 import { syncScreeningsForRaw } from "./screenings";
 import type { WebsiteConfig } from "./types";
-import { extractCinemaPoster } from "./cinema-poster";
+import { extractCinemaDetails } from "./cinema-details";
 
 export type CollectionResult={runId:string;sourceId:string;status:"SUCCEEDED"|"PARTIAL"|"FAILED";foundCount:number;createdCount:number;skippedCount:number;errorCount:number};
 
@@ -25,16 +25,21 @@ export async function collectSource(sourceId:string):Promise<CollectionResult>{
     for(const item of items){
       try{
         const existing=await existingRaw(source.id,item.externalId,item.url);
-        if(existing&&config.syncScreenings)await syncScreeningsForRaw(existing.id,item.url,safeFetchPage,item);
+        if(existing&&config.syncScreenings&&existing.eventSources.length){await syncScreeningsForRaw(existing.id,item.url,safeFetchPage,item);skipped++;continue}
         if(existing?.imageUrl?.startsWith("/media/events/")&&await storedImageExists(existing.imageUrl)){skipped++;continue}
         let storedImage:string|null=null;
         let imageUrl=item.imageUrl;
+        let rawText=item.rawText;
         let poster=false;
         if(config.syncScreenings){
           try{
             const page=await safeFetchPage(item.url);
-            const candidate=extractCinemaPoster(page.html,page.url);
-            if(candidate){imageUrl=candidate;poster=true}
+            const details=extractCinemaDetails(page.html,page.url);
+            if(details.imageUrl){imageUrl=details.imageUrl;poster=true}
+            if(!existing){
+              const extra=[details.description,details.venueName,details.address,details.ageRestriction].filter((value):value is string=>typeof value==="string"&&Boolean(value)&&!rawText.includes(value));
+              rawText=[rawText,...extra].join("\n");
+            }
           }catch(error){errors++;await recordSystemError("collector","extractPoster",error,{sourceId:source.id,url:item.url})}
         }
         if(imageUrl){try{storedImage=await persistCollectedImage(imageUrl,poster?"poster":undefined)}catch(error){errors++;await recordSystemError("collector","persistImage",error,{sourceId:source.id,url:item.url,imageUrl})}}
@@ -42,7 +47,7 @@ export async function collectSource(sourceId:string):Promise<CollectionResult>{
           if(storedImage)await prisma.$transaction([prisma.rawEvent.update({where:{id:existing.id},data:{imageUrl:storedImage}}),prisma.event.updateMany({where:{sources:{some:{rawEventId:existing.id}}},data:{imageUrl:storedImage}})]);
           skipped++;continue;
         }
-        await prisma.rawEvent.create({data:{sourceId:source.id,externalId:item.externalId,url:item.url,rawText:item.rawText,rawHtml:item.rawHtml,imageUrl:storedImage,publishedAt:item.publishedAt&&Number.isFinite(+item.publishedAt)?item.publishedAt:null}});
+        await prisma.rawEvent.create({data:{sourceId:source.id,externalId:item.externalId,url:item.url,rawText,rawHtml:item.rawHtml,imageUrl:storedImage,publishedAt:item.publishedAt&&Number.isFinite(+item.publishedAt)?item.publishedAt:null}});
         created++;
       }catch(error){errors++;await recordSystemError("collector","saveRawEvent",error,{sourceId:source.id,url:item.url})}
     }

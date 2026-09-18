@@ -1,7 +1,8 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { extractJsonLdEvents } from "./website";
 import type { CollectedItem,FetchPageResult } from "./types";
-import { extractCinemaPoster } from "./cinema-poster";
+import { extractCinemaDetails } from "./cinema-details";
 import { persistCollectedImage,storedImageExists } from "./image-storage";
 import { recordSystemError } from "./errors";
 
@@ -37,19 +38,34 @@ export function screeningFromListing(item:CollectedItem):Screening|null{
 }
 
 export async function syncScreeningsForRaw(rawEventId:string,url:string,fetchPage:(url:string)=>Promise<FetchPageResult>,listingItem?:CollectedItem){
-  const link=await prisma.eventSource.findFirst({where:{rawEventId},select:{eventId:true,event:{select:{title:true,status:true,imageUrl:true}}}});
+  const link=await prisma.eventSource.findFirst({where:{rawEventId},select:{eventId:true,event:{select:{title:true,status:true,cityId:true,description:true,shortDescription:true,venueId:true,address:true,ageRestriction:true,imageUrl:true}}}});
   if(!link)return 0;
   const page=await fetchPage(url);
-  const hasPoster=Boolean(link.event.imageUrl?.startsWith("/media/events/poster-")&&await storedImageExists(link.event.imageUrl));
-  const posterUrl=hasPoster?undefined:extractCinemaPoster(page.html,page.url);
-  if(posterUrl){
+  const details=extractCinemaDetails(page.html,page.url);
+  const eventData:Prisma.EventUncheckedUpdateInput={};
+  if(!link.event.description&&details.description){eventData.description=details.description;if(!link.event.shortDescription)eventData.shortDescription=details.description.slice(0,280)}
+  if(!link.event.ageRestriction&&details.ageRestriction)eventData.ageRestriction=details.ageRestriction;
+  if(!link.event.address&&details.address)eventData.address=details.address;
+  if(!link.event.venueId&&details.venueName&&details.address){
+    const venue=await prisma.venue.findFirst({where:{cityId:link.event.cityId,OR:[{name:details.venueName},{slug:"kinoteatr-minsk"}]}})??await prisma.venue.upsert({where:{cityId_slug:{cityId:link.event.cityId,slug:"kinoteatr-minsk"}},update:{},create:{cityId:link.event.cityId,slug:"kinoteatr-minsk",name:details.venueName,address:details.address}});
+    eventData.venueId=venue.id;
+  }
+  const missingStoredImage=Boolean(link.event.imageUrl?.startsWith("/media/events/")&&!await storedImageExists(link.event.imageUrl));
+  let refreshedImage:string|null|undefined;
+  if((!link.event.imageUrl||missingStoredImage)&&details.imageUrl){
     try{
-      const imageUrl=await persistCollectedImage(posterUrl,"poster");
-      if(imageUrl)await prisma.$transaction([
-        prisma.rawEvent.update({where:{id:rawEventId},data:{imageUrl}}),
-        prisma.event.update({where:{id:link.eventId},data:{imageUrl}}),
-      ]);
-    }catch(error){await recordSystemError("collector","persistPoster",error,{rawEventId,url:posterUrl})}
+      const imageUrl=await persistCollectedImage(details.imageUrl,"poster");
+      if(imageUrl)refreshedImage=imageUrl;
+    }catch(error){await recordSystemError("collector","persistPoster",error,{rawEventId,url:details.imageUrl})}
+  }
+  if(missingStoredImage&&refreshedImage===undefined)refreshedImage=null;
+  if(refreshedImage!==undefined)eventData.imageUrl=refreshedImage;
+  if(Object.keys(eventData).length){
+    await prisma.$transaction(async tx=>{
+      await tx.event.update({where:{id:link.eventId},data:eventData});
+      if(refreshedImage!==undefined)await tx.rawEvent.update({where:{id:rawEventId},data:{imageUrl:refreshedImage}});
+    });
+    console.info("[collector:screenings] enriched",{rawEventId,title:link.event.title,fields:Object.keys(eventData)});
   }
   const detailScreenings=parseScreenings(page.html,page.url);
   const listingScreening=listingItem?screeningFromListing(listingItem):null;

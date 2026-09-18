@@ -41,7 +41,7 @@ export function mapEvent(row: DbEvent,window:OccurrenceWindow={from:new Date()})
     id: row.id, slug: row.slug, title: row.title,
     shortDescription: row.shortDescription ?? row.description ?? "Подробности события уточняются.",
     description: row.description ?? row.shortDescription ?? "Подробности события уточняются.",
-    imageUrl: row.imageUrl ?? fallbackImage,
+    imageUrl: row.imageUrl ?? (row.category.slug === "cinema" ? "/brand/cinema-no-poster.svg" : fallbackImage),
     city: { slug: row.city.slug, name: row.city.name, preposition: preposition(row.city.name), timezone: row.city.timezone },
     venue: row.venue?.name ?? "Место уточняется",
     address: row.address ?? row.venue?.address ?? "Адрес уточняется",

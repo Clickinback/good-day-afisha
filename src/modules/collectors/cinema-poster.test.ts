@@ -11,3 +11,7 @@ test("rejects landscape banners and unsafe hosts", () => {
   assert.equal(extractCinemaPoster('<h1>Фильм</h1><img class="poster" alt="Фильм" src="/storage/banner.webp" width="1200" height="630">', url), undefined);
   assert.equal(extractCinemaPoster('<h1>Фильм</h1><img alt="Фильм" src="https://other.example/poster.jpg" width="400" height="600">', url), undefined);
 });
+test("uses the actual lazy-loaded poster URL", () => {
+  const html='<h1>Фильм</h1><img alt="Фильм" width="400" height="600" src="/placeholder.svg" data-src="/storage/film.webp">';
+  assert.equal(extractCinemaPoster(html,url),"https://hubl.by/storage/film.webp");
+});
