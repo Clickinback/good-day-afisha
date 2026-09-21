@@ -9,7 +9,9 @@ import { runLifecycle } from "@/modules/lifecycle/service";
 import { evaluatePublicationBatch } from "@/modules/publication/service";
 
 const PIPELINE_KEY = "good-day-automation";
+const PAUSE_KEY = "good-day-automation-pause";
 const LEASE_MS = 2 * 60 * 60 * 1000;
+const PAUSE_UNTIL = new Date("2100-01-01T00:00:00.000Z");
 
 export type AutomationStep = {
   name: string;
@@ -21,11 +23,22 @@ export type AutomationStep = {
 
 export type AutomationResult = {
   runId?: string;
-  status: "SUCCEEDED" | "PARTIAL" | "FAILED" | "LOCKED";
+  status: "SUCCEEDED" | "PARTIAL" | "FAILED" | "LOCKED" | "PAUSED";
   startedAt: string;
   finishedAt: string;
   steps: AutomationStep[];
 };
+
+export async function isAutomationPaused(now=new Date()){
+  const pause=await prisma.automationLock.findUnique({where:{key:PAUSE_KEY},select:{expiresAt:true}});
+  return Boolean(pause&&pause.expiresAt>now);
+}
+
+export async function setAutomationPaused(paused:boolean,actor="environment-admin"){
+  if(!paused){await prisma.automationLock.deleteMany({where:{key:PAUSE_KEY}});return false}
+  await prisma.automationLock.upsert({where:{key:PAUSE_KEY},update:{ownerId:actor,expiresAt:PAUSE_UNTIL},create:{key:PAUSE_KEY,ownerId:actor,expiresAt:PAUSE_UNTIL}});
+  return true;
+}
 
 async function acquireLock(ownerId: string) {
   const expiresAt = new Date(Date.now() + LEASE_MS);
@@ -68,6 +81,10 @@ async function executeStep(
 
 export async function runAutomationPipeline(trigger = "manual"): Promise<AutomationResult> {
   const startedAt = new Date();
+  if(await isAutomationPaused(startedAt)){
+    const finishedAt=new Date();
+    return {status:"PAUSED",startedAt:startedAt.toISOString(),finishedAt:finishedAt.toISOString(),steps:[]};
+  }
   if (trigger === "admin") {
     const recent = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
       'SELECT COUNT(*)::bigint AS "count" FROM "AutomationRun" WHERE "trigger" = $1 AND "startedAt" > NOW() - INTERVAL \'1 minute\'',

@@ -1,8 +1,9 @@
-import { Activity, AlertTriangle, Bot, CheckCircle2, Clock3, Database, Radio, XCircle } from "lucide-react";
-import { runAutomationNow } from "@/app/admin/automation-actions";
+import { Activity, AlertTriangle, Bot, CheckCircle2, Clock3, Database, PauseCircle, PlayCircle, Radio, XCircle } from "lucide-react";
+import { runAutomationNow,setAutomationPausedAction } from "@/app/admin/automation-actions";
 import { AutomationRunButton } from "@/components/admin/automation-run-button";
 import { prisma } from "@/lib/prisma";
 import { estimateOpenAiCost, formatEstimatedUsd, formatTokenCount, openAiPricingFromEnv, openAiUsageWindows, type TokenUsage } from "@/lib/openai-usage";
+import { isAutomationPaused } from "@/modules/automation/service";
 
 type Step = {
   name: string;
@@ -59,6 +60,7 @@ export default async function AutomationPage() {
   let runs: Run[] = [];
   let dbConnected = true;
   let activeSources = 0;
+  let automationPaused = false;
   const usageWindows = openAiUsageWindows();
   let tokenUsage: Record<"today" | "sevenDays" | "thirtyDays", TokenUsage> = {
     today: { input: 0, output: 0 },
@@ -66,15 +68,17 @@ export default async function AutomationPage() {
     thirtyDays: { input: 0, output: 0 },
   };
   try {
-    const [recentRuns, sourceCount, today, sevenDays, thirtyDays] = await Promise.all([
+    const [recentRuns, sourceCount, paused, today, sevenDays, thirtyDays] = await Promise.all([
       prisma.$queryRawUnsafe<Run[]>('SELECT "id", "status", "trigger", "startedAt", "finishedAt", "steps", "errorMessage", NOW() AS "serverNow" FROM "AutomationRun" ORDER BY "startedAt" DESC LIMIT 30'),
       prisma.source.count({ where: { active: true } }),
+      isAutomationPaused(),
       prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.today } }, _sum: { inputTokens: true, outputTokens: true } }),
       prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.sevenDays } }, _sum: { inputTokens: true, outputTokens: true } }),
       prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.thirtyDays } }, _sum: { inputTokens: true, outputTokens: true } }),
     ]);
     runs = recentRuns;
     activeSources = sourceCount;
+    automationPaused = paused;
     tokenUsage = {
       today: { input: today._sum.inputTokens ?? 0, output: today._sum.outputTokens ?? 0 },
       sevenDays: { input: sevenDays._sum.inputTokens ?? 0, output: sevenDays._sum.outputTokens ?? 0 },
@@ -107,7 +111,8 @@ export default async function AutomationPage() {
     !dbConnected ? "PostgreSQL недоступен. Проверьте Docker Desktop и DATABASE_URL." : null,
     dbConnected && activeSources === 0 ? "Нет активных источников для автоматического сбора." : null,
     !aiConfigured ? "AI-разбор отключён: не настроены OPENAI_API_KEY или OPENAI_EVENT_PARSER_MODEL." : null,
-    dbConnected && stale ? "Автоматизация давно не запускалась. Проверьте планировщик Windows." : null,
+    dbConnected && stale && !automationPaused ? "Автоматизация давно не запускалась. Проверьте планировщик Windows." : null,
+    dbConnected && automationPaused ? "Автоматизация приостановлена. Плановые циклы пропускаются до возобновления." : null,
     last?.status === "FAILED" || last?.status === "PARTIAL" ? "Последний запуск завершился с ошибками или предупреждениями." : null,
   ].filter((item): item is string => Boolean(item));
 
@@ -119,7 +124,13 @@ export default async function AutomationPage() {
           <h1>Автоматизация</h1>
           <p>Полный цикл обновления афиши и состояние фоновых процессов.</p>
         </div>
-        <form action={runAutomationNow}><AutomationRunButton disabled={!dbConnected} /></form>
+        <div className="automation-controls">
+          <form action={setAutomationPausedAction}>
+            <input type="hidden" name="paused" value={automationPaused?"false":"true"}/>
+            <button className="admin-primary" disabled={!dbConnected}>{automationPaused?<><PlayCircle size={16}/>Возобновить</>:<><PauseCircle size={16}/>Приостановить</>}</button>
+          </form>
+          <form action={runAutomationNow}><AutomationRunButton disabled={!dbConnected||automationPaused} /></form>
+        </div>
       </header>
 
       {warnings.map((warning) => <div className="admin-notice" key={warning}><AlertTriangle /><div><b>Требует внимания</b><p>{warning}</p></div></div>)}
