@@ -35,6 +35,7 @@ const summaryNames: Record<string, string> = {
   processed: "обработано", MATCHED: "совпадений", MODERATION: "на проверку",
   CREATED: "новых", SKIPPED: "пропущено", evaluated: "оценено",
   published: "опубликовано", moderation: "на модерации", finished: "завершено",
+  expirationChecked: "проверено по сроку", publishedFinished: "завершено опубликованных", pendingFinished: "очередь очищена", dateAnomalies: "аномалий года", sourceUpdatesChecked: "обновлений источников",
   checked: "проверено", applied: "применено", review: "требует проверки", skipped: "пропущено",
   collections: "подборок", events: "событий",
 };
