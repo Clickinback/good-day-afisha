@@ -15,7 +15,12 @@ function normalizeDate(value:string|null,rawText:string,publishedAt:Date){
   if(hasExplicitYear(rawText,year))return value;
   return `${inferredYear(Number(monthText),Number(dayText),publishedAt)}-${monthText}-${dayText}`;
 }
-export function normalizeImplicitEventYear(event:ParsedEvent,rawText:string,publishedAt:Date|null|undefined):ParsedEvent{
-  if(!publishedAt||!Number.isFinite(+publishedAt))return event;
-  return {...event,startDate:normalizeDate(event.startDate,rawText,publishedAt),endDate:normalizeDate(event.endDate,rawText,publishedAt)};
+export function resolveDateAnchor(publishedAt?:Date|null,collectedAt?:Date|null):Date|null{
+  for(const date of [publishedAt,collectedAt])if(date&&Number.isFinite(+date))return date;
+  return null;
+}
+export function normalizeImplicitEventYear(event:ParsedEvent,rawText:string,publishedAt:Date|null|undefined,collectedAt?:Date|null):ParsedEvent{
+  const anchor=resolveDateAnchor(publishedAt,collectedAt);
+  if(!anchor)return event;
+  return {...event,startDate:normalizeDate(event.startDate,rawText,anchor),endDate:normalizeDate(event.endDate,rawText,anchor)};
 }
