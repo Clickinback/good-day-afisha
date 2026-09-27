@@ -6,7 +6,15 @@ import { assertSafeUrl } from "./http";
 const MAX_IMAGE_BYTES=8_000_000;
 const contentTypes:Record<string,string>={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"};
 
-export function isPersistableImageUrl(value:string){try{const url=new URL(value);return url.protocol==="https:"&&(/^cdn\d*\.telesco\.pe$/i.test(url.hostname)||(url.hostname==="hubl.by"&&url.pathname.startsWith("/storage/")))}catch{return false}}
+export function isPersistableImageUrl(value:string){
+  try{
+    const url=new URL(value);
+    if(url.protocol!=="https:"||url.username||url.password)return false;
+    // HUBL also supplies Movie.image posters hosted by TMDB instead of its own storage.
+    const tmdbImage=url.origin==="https://image.tmdb.org"&&/^\/t\/p\/(?:w[1-9]\d*|h[1-9]\d*|original)\/[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(url.pathname);
+    return /^cdn\d*\.telesco\.pe$/i.test(url.hostname)||(url.hostname==="hubl.by"&&url.pathname.startsWith("/storage/"))||tmdbImage;
+  }catch{return false}
+}
 export const extensionForContentType=(value:string)=>contentTypes[value.split(";")[0].trim().toLowerCase()]??null;
 const storedName=/^(?:poster-)?[a-f0-9]{64}\.(?:jpg|png|webp|gif)$/;
 export const collectedImagesDirectory=()=>path.join(process.cwd(),"public","media","events");
