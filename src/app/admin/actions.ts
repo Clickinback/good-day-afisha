@@ -6,6 +6,8 @@ import { clearAdminLoginFailures,getAdminLoginLockSeconds,recordAdminLoginFailur
 import { prisma } from "@/lib/prisma";
 import { eventFormSchema,type EventFormState } from "@/modules/admin/schemas";
 import { sourceFormSchema,type AdminFormState } from "@/modules/admin/schemas";
+import { needsSourceCheck, validateSourceCheck } from "@/modules/admin/source-check";
+import { sourceFormValues } from "@/modules/collectors/source-presets";
 
 export async function login(_: {error?:string},formData:FormData):Promise<{error?:string}>{
   const lockSeconds=await getAdminLoginLockSeconds();
@@ -38,9 +40,25 @@ export async function updateEvent(id:string,_:EventFormState,formData:FormData):
 
 export async function updateEventStatus(formData:FormData){await requireAdmin();const id=String(formData.get("id"));const status=String(formData.get("status")) as "DRAFT"|"PUBLISHED"|"REJECTED"|"CANCELLED";await prisma.$transaction(async tx=>{const event=await tx.event.update({where:{id},data:{status,moderationStatus:status==="PUBLISHED"?"APPROVED":status==="REJECTED"?"REJECTED":undefined,publishedAt:status==="PUBLISHED"?new Date():undefined}});await tx.moderationLog.create({data:{eventId:id,actorId:"environment-admin",action:status==="PUBLISHED"?"PUBLISHED":status==="REJECTED"?"REJECTED":status==="CANCELLED"?"CANCELLED":"EDITED",after:{status:event.status}}})});revalidatePath("/admin");revalidatePath("/admin/events");revalidatePath("/admin/moderation");revalidatePath("/","layout")}
 
-export async function createSource(_:AdminFormState,formData:FormData):Promise<AdminFormState>{await requireAdmin();const parsed=sourceFormSchema.safeParse(values(formData));if(!parsed.success)return {ok:false,message:"Проверьте заполненные поля",errors:parsed.error.flatten().fieldErrors};const d=parsed.data;try{await prisma.source.create({data:{name:d.name,type:d.type,url:d.url,cityId:d.cityId||null,trustScore:d.trustScore,collectionMethod:d.collectionMethod,active:d.active,config:d.config as object|undefined}})}catch(error){return {ok:false,message:error instanceof Error?`Не удалось сохранить: ${error.message}`:"Не удалось создать источник"}}revalidatePath("/admin/sources");redirect("/admin/sources")}
-export async function updateSource(id:string,_:AdminFormState,formData:FormData):Promise<AdminFormState>{await requireAdmin();const parsed=sourceFormSchema.safeParse(values(formData));if(!parsed.success)return {ok:false,message:"Проверьте заполненные поля",errors:parsed.error.flatten().fieldErrors};const d=parsed.data;try{await prisma.source.update({where:{id},data:{name:d.name,type:d.type,url:d.url,cityId:d.cityId||null,trustScore:d.trustScore,collectionMethod:d.collectionMethod,active:d.active,config:d.config as object|undefined}})}catch(error){return {ok:false,message:error instanceof Error?`Не удалось сохранить: ${error.message}`:"Не удалось обновить источник"}}revalidatePath("/admin/sources");redirect("/admin/sources")}
-export async function toggleSource(formData:FormData){await requireAdmin();const id=String(formData.get("id"));const active=String(formData.get("active"))==="true";await prisma.source.update({where:{id},data:{active}});revalidatePath("/admin/sources")}
+async function saveSource(formData:FormData,id?:string):Promise<AdminFormState>{
+  await requireAdmin();
+  const parsed=sourceFormSchema.safeParse(sourceFormValues(values(formData)));
+  if(!parsed.success)return {ok:false,message:"Проверьте заполненные поля (технические параметры — в расширенных настройках)",errors:parsed.error.flatten().fieldErrors};
+  const d=parsed.data;
+  try{
+    const before=id?await prisma.source.findUniqueOrThrow({where:{id}}):undefined;
+    const previous=before?{...before,config:(before.config??{}) as Record<string,unknown>}:undefined;
+    if(needsSourceCheck(d.active,d,previous)&&!validateSourceCheck(String(formData.get("previewToken")??""),d,process.env.AUTH_SECRET??"")){
+      return {ok:false,message:"Перед включением нажмите «Проверить источник». Если ссылка или настройки изменились, проверку нужно повторить. Можно сохранить источник выключенным."};
+    }
+    const data={name:d.name,type:d.type,url:d.url,cityId:d.cityId||null,trustScore:d.trustScore,collectionMethod:d.collectionMethod,active:d.active,config:d.config as object};
+    if(id)await prisma.source.update({where:{id},data});else await prisma.source.create({data});
+  }catch(error){return {ok:false,message:(error as {code?:string}).code==="P2002"?"Источник с такой ссылкой уже существует. Откройте его в списке источников.":"Не удалось сохранить источник. Проверьте поля и подключение к базе."}}
+  revalidatePath("/admin/sources");redirect("/admin/sources");
+}
+export async function createSource(_:AdminFormState,formData:FormData){return saveSource(formData)}
+export async function updateSource(id:string,_:AdminFormState,formData:FormData){return saveSource(formData,id)}
+export async function toggleSource(formData:FormData){await requireAdmin();const id=String(formData.get("id"));const active=String(formData.get("active"))==="true";if(active)redirect(`/admin/sources/${encodeURIComponent(id)}/edit`);await prisma.source.update({where:{id},data:{active:false}});revalidatePath("/admin/sources")}
 export async function retryRawEvent(formData:FormData){await requireAdmin();const id=String(formData.get("id"));await prisma.rawEvent.update({where:{id},data:{processingStatus:"NEW",processingError:null}});revalidatePath("/admin/raw-events");revalidatePath(`/admin/raw-events/${id}`)}
 export async function resolveSystemError(formData:FormData){await requireAdmin();await prisma.systemError.update({where:{id:String(formData.get("id"))},data:{resolvedAt:new Date()}});revalidatePath("/admin/errors")}
 export async function runCollector(formData:FormData){await requireAdmin();const {collectSource}=await import("@/modules/collectors/service");await collectSource(String(formData.get("id")));revalidatePath("/admin/sources");revalidatePath("/admin/raw-events");revalidatePath("/admin/collector-runs");revalidatePath("/admin/errors")}

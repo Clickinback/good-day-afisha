@@ -12,7 +12,8 @@ export function isPersistableImageUrl(value:string){
     if(url.protocol!=="https:"||url.username||url.password)return false;
     // HUBL also supplies Movie.image posters hosted by TMDB instead of its own storage.
     const tmdbImage=url.origin==="https://image.tmdb.org"&&/^\/t\/p\/(?:w[1-9]\d*|h[1-9]\d*|original)\/[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(url.pathname);
-    return /^cdn\d*\.telesco\.pe$/i.test(url.hostname)||(url.hostname==="hubl.by"&&url.pathname.startsWith("/storage/"))||tmdbImage;
+    const ticketproImage=["https://www.ticketpro.by","https://ticketpro.by"].includes(url.origin)&&/^\/storage\/img\/uploads\/event\/[a-z0-9_-]+\.(?:jpe?g|png|webp|gif)$/i.test(url.pathname);
+    return /^cdn\d*\.telesco\.pe$/i.test(url.hostname)||(url.hostname==="hubl.by"&&url.pathname.startsWith("/storage/"))||tmdbImage||ticketproImage;
   }catch{return false}
 }
 export const extensionForContentType=(value:string)=>contentTypes[value.split(";")[0].trim().toLowerCase()]??null;

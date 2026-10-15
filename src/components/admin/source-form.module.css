@@ -1,0 +1,32 @@
+.form { min-width: 0; }
+.fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 18px; }
+.form :global(.form-grid) { min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.form input, .form textarea, .form select { min-width: 0; max-width: 100%; }
+.notice { padding: 16px; border-radius: 8px; background: #f5f4ec; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.notice p { margin: 6px 0 0; }
+.url { font-size: 12px; }
+.help { color: #66635d; font-size: 12px; line-height: 1.6; margin: 10px 0; }
+.checkArea { min-width: 0; font-size: 13px; }
+.checkButton { background: #171713; color: white; padding: 13px 20px; border: 0; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+.form button:disabled { opacity: .55; cursor: not-allowed; }
+.form input:focus-visible, .form button:focus-visible, .form summary:focus-visible { outline: 2px solid #4361ff; outline-offset: 3px; }
+.activation { display: flex; gap: 10px; align-items: center; font-size: 13px; margin: 18px 0 8px; cursor: pointer; }
+.activation input { width: 18px; height: 18px; flex-shrink: 0; }
+.advanced { padding: 24px; background: #fff; border: 1px solid #dedbd2; border-radius: 12px; }
+.advanced summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+.success, .failure { border-left: 3px solid #4f813c; padding-left: 14px; margin: 18px 0; }
+.failure { border-color: #c55031; }
+.previews { padding: 0; margin: 18px 0; list-style: none; display: grid; gap: 14px; }
+.previews li { display: grid; grid-template-columns: 95px minmax(0, 1fr); gap: 14px; border-top: 1px solid #e8e4dc; padding-top: 14px; }
+.previews img { width: 95px; height: 140px; object-fit: contain; background: #f5f4ec; border-radius: 6px; }
+.noImage { width: 95px; min-height: 100px; padding: 10px; display: grid; place-items: center; background: #f5f4ec; font-size: 11px; line-height: 1.4; border-radius: 6px; }
+.previews h3 { font-size: 14px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.previews a { text-decoration: underline; text-underline-offset: 3px; }
+.excerpt { white-space: pre-line; overflow-wrap: anywhere; max-height: 150px; overflow-y: auto; font-size: 12px; line-height: 1.6; margin: 0; }
+@media (max-width: 600px) {
+  .form :global(.form-grid) { grid-template-columns: minmax(0, 1fr); }
+  .form :global(.form-section) { padding: 18px; gap: 16px; }
+  .advanced { padding: 18px; }
+  .previews li { grid-template-columns: minmax(0, 1fr); }
+  .form :global(.form-footer) { flex-wrap: wrap; }
+}

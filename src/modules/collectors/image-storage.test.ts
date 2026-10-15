@@ -21,4 +21,9 @@ test("does not extend TMDB permission to other hosts, ports, paths or credential
   ])assert.equal(isPersistableImageUrl(url),false,url);
 });
 test("maps supported image MIME types",()=>{assert.equal(extensionForContentType("image/jpeg; charset=binary"),"jpg");assert.equal(extensionForContentType("text/html"),null)});
+test("Ticketpro images are restricted to HTTPS event poster paths",()=>{
+  assert.equal(isPersistableImageUrl("https://www.ticketpro.by/storage/img/uploads/event/6a38f23f0add5.png"),true);
+  for(const url of ["https://www.ticketpro.by/build/img/logo.svg","https://www.ticketpro.by:8443/storage/img/uploads/event/a.png","https://www.ticketpro.by.evil.test/storage/img/uploads/event/a.png","https://user:pass@www.ticketpro.by/storage/img/uploads/event/a.png","http://www.ticketpro.by/storage/img/uploads/event/a.png"])
+    assert.equal(isPersistableImageUrl(url),false,url);
+});
 test("accepts only content-addressed media filenames",()=>{const hash="a".repeat(64);assert.equal(storedImageFilename(`/media/events/poster-${hash}.webp`),`poster-${hash}.webp`);assert.equal(storedImageFilename("/media/events/../../.env.production"),null)});

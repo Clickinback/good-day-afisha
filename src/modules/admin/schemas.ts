@@ -17,14 +17,23 @@ export const eventFormSchema = z.object({
 
 export type EventFormState={ok:boolean;message?:string;errors?:Record<string,string[]>};
 
+const collectorSettingsSchema=z.object({
+  maxItems:z.number().int().min(1).max(100).optional(),
+  delayMs:z.number().int().min(0).max(5000).optional(),
+  respectRobots:z.boolean().optional(), syncScreenings:z.boolean().optional(), includeForwarded:z.boolean().optional(),
+  itemSelector:z.string().max(1000).optional(), linkSelector:z.string().max(1000).optional(),
+  titleSelector:z.string().max(1000).optional(), descriptionSelector:z.string().max(1000).optional(),
+  imageSelector:z.string().max(1000).optional(), dateSelector:z.string().max(1000).optional(),
+}).passthrough();
+
 export const sourceFormSchema=z.object({
   name:z.string().trim().min(2,"Введите название"),
   type:z.enum(["WEBSITE","TELEGRAM","RSS","API","SOCIAL","MANUAL"]),
-  url:z.string().url("Введите полную ссылку"),
+  url:z.string().max(2048).url("Введите полную ссылку").refine(value=>{try{const url=new URL(value);return ["http:","https:"].includes(url.protocol)&&!url.username&&!url.password}catch{return false}},"Нужна HTTP(S)-ссылка без логина и пароля"),
   cityId:z.string().optional(),
   trustScore:z.coerce.number().min(0).max(1),
   collectionMethod:z.enum(["HTML","RSS","API","TELEGRAM","MANUAL"]),
   active:z.coerce.boolean().default(false),
-  config:z.string().trim().optional().transform((value,ctx)=>{if(!value)return undefined;try{return JSON.parse(value) as unknown}catch{ctx.addIssue({code:"custom",message:"Некорректный JSON"});return z.NEVER}}),
+  config:z.string().trim().max(20_000).optional().transform((value,ctx)=>{if(!value)return {};try{const parsed:unknown=JSON.parse(value);if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error();return parsed as Record<string,unknown>}catch{ctx.addIssue({code:"custom",message:"Конфигурация должна быть JSON-объектом, например {}"});return z.NEVER}}).pipe(collectorSettingsSchema),
 });
 export type AdminFormState={ok:boolean;message?:string;errors?:Record<string,string[]>};
