@@ -7,6 +7,13 @@ node_modules
 !.env.example
 !.env.production.example
 .docker-data
+# Runtime uploads are supplied by the persistent media mount, not the image.
+public/media
+# Host-only backups, transfer bundles and local diagnostics.
+backups
+deployment-transfer
+.moved-remnants
+coverage
 docs
 *.log
 tsconfig.tsbuildinfo

@@ -13,6 +13,6 @@ COPY --from=dependencies --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --chown=nextjs:nodejs . .
 RUN chown nextjs:nodejs /app
 USER nextjs
-RUN pnpm prisma generate && pnpm build && cp -R public/media /app/media-seed && chmod +x scripts/start-render.sh
+RUN pnpm prisma generate && pnpm build && mkdir -p public/media/events && cp -R public/media /app/media-seed && chmod +x scripts/start-render.sh
 EXPOSE 10000
 CMD ["./scripts/start-render.sh"]
