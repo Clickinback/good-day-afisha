@@ -19,7 +19,7 @@ export async function previewSourceItems(setup: SourceSetup, fetchPage: (url: st
     id: 'preview-only', name: 'Проверка источника', url: setup.url, type: setup.type as Source['type'],
     collectionMethod: setup.collectionMethod as Source['collectionMethod'],
     config: { ...setup.config, maxItems, delayMs: 0 } as Prisma.JsonObject,
-    cityId: null, active: false, trustScore: new Prisma.Decimal('0.5'),
+    cityId: null, active: false, deletedAt: null, trustScore: new Prisma.Decimal('0.5'),
     lastCheckedAt: null, createdAt: new Date(), updatedAt: new Date(),
   };
   const items = await collectorFor(source).collect(source, { fetchPage, log: () => undefined });

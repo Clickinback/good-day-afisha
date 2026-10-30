@@ -26,6 +26,7 @@ async function uniqueSlug(title:string){
 
 async function createEventFromRaw(rawId:string){
   const raw=await prisma.rawEvent.findUniqueOrThrow({where:{id:rawId},include:{source:true}});
+  if(raw.source.deletedAt)throw new Error("Источник удалён");
   const parsed=parsedEventSchema.parse(raw.parsedData);
   if(!parsed.isEvent||!parsed.title||!parsed.startDate)return null;
   const title=parsed.title,startDate=parsed.startDate;
@@ -47,6 +48,7 @@ async function createEventFromRaw(rawId:string){
 
 export async function deduplicateRawEvent(rawEventId:string):Promise<DeduplicationResult>{
   const raw=await prisma.rawEvent.findUniqueOrThrow({where:{id:rawEventId},include:{source:{include:{city:true}},eventSources:true,duplicateCandidates:true}});
+  if(raw.source.deletedAt)return {rawEventId,decision:"SKIPPED",reason:"Источник удалён"};
   if(raw.processingStatus!=="PROCESSED")return {rawEventId,decision:"SKIPPED",reason:"RawEvent не обработан AI"};
   if(raw.eventSources.length||raw.duplicateCandidates.length)return {rawEventId,decision:"SKIPPED",reason:"Deduplication уже выполнен"};
   let parsed:ParsedEvent;
@@ -102,7 +104,7 @@ export async function deduplicateRawEvent(rawEventId:string):Promise<Deduplicati
 }
 
 export async function deduplicateBatch(limit=20){
-  const rows=await prisma.rawEvent.findMany({where:{processingStatus:"PROCESSED",eventSources:{none:{}},duplicateCandidates:{none:{}}},select:{id:true},orderBy:{processedAt:"asc"},take:Math.min(Math.max(limit,1),100)});
+  const rows=await prisma.rawEvent.findMany({where:{processingStatus:"PROCESSED",source:{deletedAt:null},eventSources:{none:{}},duplicateCandidates:{none:{}}},select:{id:true},orderBy:{processedAt:"asc"},take:Math.min(Math.max(limit,1),100)});
   const results:DeduplicationResult[]=[];
   for(const row of rows){
     try{results.push(await deduplicateRawEvent(row.id))}

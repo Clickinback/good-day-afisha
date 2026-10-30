@@ -70,7 +70,7 @@ export default async function AutomationPage() {
   try {
     const [recentRuns, sourceCount, paused, today, sevenDays, thirtyDays] = await Promise.all([
       prisma.$queryRawUnsafe<Run[]>('SELECT "id", "status", "trigger", "startedAt", "finishedAt", "steps", "errorMessage", NOW() AS "serverNow" FROM "AutomationRun" ORDER BY "startedAt" DESC LIMIT 30'),
-      prisma.source.count({ where: { active: true } }),
+      prisma.source.count({ where: { active: true, deletedAt: null } }),
       isAutomationPaused(),
       prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.today } }, _sum: { inputTokens: true, outputTokens: true } }),
       prisma.rawEvent.aggregate({ where: { processedAt: { gte: usageWindows.sevenDays } }, _sum: { inputTokens: true, outputTokens: true } }),

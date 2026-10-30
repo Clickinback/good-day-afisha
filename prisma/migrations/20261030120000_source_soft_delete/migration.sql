@@ -1,0 +1,1 @@
+ALTER TABLE "Source" ADD COLUMN "deletedAt" TIMESTAMP(3);

@@ -8,13 +8,18 @@ import type { WebsiteConfig } from "./types";
 import { extractCinemaDetails } from "./cinema-details";
 
 export type CollectionResult={runId:string;sourceId:string;status:"SUCCEEDED"|"PARTIAL"|"FAILED";foundCount:number;createdCount:number;skippedCount:number;errorCount:number};
+class SourceUnavailableError extends Error {}
 
 async function existingRaw(sourceId:string,externalId:string|undefined,url:string){return prisma.rawEvent.findFirst({where:{sourceId,OR:[...(externalId?[{externalId}]:[]),{url}]},include:{eventSources:{select:{eventId:true}}}})}
 
 export async function collectSource(sourceId:string):Promise<CollectionResult>{
-  const source=await prisma.source.findUniqueOrThrow({where:{id:sourceId}});
-  if(!source.active)throw new Error("Источник выключен");
-  const run=await prisma.collectorRun.create({data:{sourceId}});
+  const {source,run}=await prisma.$transaction(async tx=>{
+    const claimed=await tx.source.updateMany({where:{id:sourceId,active:true,deletedAt:null},data:{updatedAt:new Date()}});
+    if(!claimed.count)throw new SourceUnavailableError("Источник выключен или удалён");
+    const source=await tx.source.findUniqueOrThrow({where:{id:sourceId}});
+    const run=await tx.collectorRun.create({data:{sourceId}});
+    return {source,run};
+  });
   let found=0,created=0,skipped=0,errors=0;
   try{
     const config=(source.config??{}) as WebsiteConfig;
@@ -63,4 +68,4 @@ export async function collectSource(sourceId:string):Promise<CollectionResult>{
 }
 
 function collectorName(type:string){return `collect${type[0]}${type.slice(1).toLowerCase()}`}
-export async function collectActiveSources(){const sources=await prisma.source.findMany({where:{active:true},select:{id:true}});const results:CollectionResult[]=[];for(const source of sources)results.push(await collectSource(source.id));return results}
+export async function collectActiveSources(){const sources=await prisma.source.findMany({where:{active:true,deletedAt:null},select:{id:true}});const results:CollectionResult[]=[];for(const source of sources){try{results.push(await collectSource(source.id))}catch(error){if(!(error instanceof SourceUnavailableError))throw error}}return results}
