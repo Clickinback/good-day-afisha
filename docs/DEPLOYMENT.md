@@ -45,10 +45,62 @@
 
 ## Обновление
 
+На действующем сервере включите паузу автоматизации и дождитесь завершения
+активного цикла. Перед миграциями сделайте резервную копию базы. Получите нужный
+коммит и зафиксируйте `git rev-parse --short HEAD`.
+
+Во **всех** командах ниже используйте прежние аргументы проекта и Compose override,
+если они используются на сервере: имя контейнера, сети общего Caddy и mount
+`public/media` должны сохраниться. База должна быть уже запущена и здорова.
+
+Сначала обязательно пересоберите и запустите миграции:
+
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
-docker image prune -f
+docker compose --env-file .env.production -f docker-compose.production.yml run --rm --no-deps --build migrate
 ```
+
+`migrate` собирается отдельным образом из стадии `migrator`. Пересборка только
+`app` его не обновляет. Без `--build` команда может использовать старый набор
+миграций и сообщить `No pending migrations to apply`, хотя в новом коммите
+есть ещё миграции. При ошибке остановите деплой, приложение не пересоздавайте.
+
+Сверьте последнюю миграцию в полученном коммите:
+
+```bash
+find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | tail -n 1
+```
+
+Затем выведите последнюю успешно применённую миграцию **из базы**:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec -T database sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT migration_name, finished_at
+FROM "_prisma_migrations"
+WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+ORDER BY migration_name DESC
+LIMIT 1;
+
+SELECT migration_name, started_at
+FROM "_prisma_migrations"
+WHERE finished_at IS NULL AND rolled_back_at IS NULL;
+SQL
+```
+
+Имя в первом результате должно совпасть с ожидаемой последней миграцией коммита,
+второй результат должен быть пустым. Одного сообщения `No pending` недостаточно.
+При несовпадении или незавершённой миграции остановитесь и выясните причину;
+не отмечайте миграции применёнными вручную ради продолжения деплоя.
+
+После успешной сверки пересоберите и пересоздайте только приложение:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --no-deps --build app
+```
+
+Проверьте health, логи, публичную страницу, сети и mount постеров. После успешных
+проверок снимите паузу автоматизации. База, scheduler и общий Caddy при таком
+обновлении не пересоздаются. Для изменений конфигурации этих сервисов нужен
+отдельный план обновления.
 
 ### Постеры и постоянное хранилище
 
