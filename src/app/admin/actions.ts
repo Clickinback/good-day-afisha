@@ -8,6 +8,7 @@ import { eventFormSchema,type EventFormState } from "@/modules/admin/schemas";
 import { sourceFormSchema,type AdminFormState } from "@/modules/admin/schemas";
 import { needsSourceCheck, validateSourceCheck } from "@/modules/admin/source-check";
 import { sourceFormValues } from "@/modules/collectors/source-presets";
+import { createOrRestoreSource } from "@/modules/admin/create-or-restore-source";
 
 export async function login(_: {error?:string},formData:FormData):Promise<{error?:string}>{
   const lockSeconds=await getAdminLoginLockSeconds();
@@ -53,9 +54,9 @@ async function saveSource(formData:FormData,id?:string):Promise<AdminFormState>{
       return {ok:false,message:"Перед включением нажмите «Проверить источник». Если ссылка или настройки изменились, проверку нужно повторить. Можно сохранить источник выключенным."};
     }
     const data={name:d.name,type:d.type,url:d.url,cityId:d.cityId||null,trustScore:d.trustScore,collectionMethod:d.collectionMethod,active:d.active,config:d.config as object};
-    if(id)await prisma.source.update({where:{id,deletedAt:null},data});else await prisma.source.create({data});
-  }catch(error){return {ok:false,message:(error as {code?:string}).code==="P2002"?"Источник с такой ссылкой уже существует. Если он ранее удалён, обратитесь к администратору для восстановления.":"Не удалось сохранить источник. Проверьте поля и подключение к базе."}}
-  revalidatePath("/admin/sources");redirect("/admin/sources");
+    if(id)await prisma.source.update({where:{id,deletedAt:null},data});else await prisma.$transaction(tx=>createOrRestoreSource(tx,data));
+  }catch(error){return {ok:false,message:(error as {code?:string}).code==="P2002"?"Источник с такой ссылкой уже есть в списке. Откройте его для редактирования.":"Не удалось сохранить источник. Проверьте поля и подключение к базе."}}
+  revalidatePath("/admin/sources");revalidatePath("/admin/automation");redirect("/admin/sources");
 }
 export async function createSource(_:AdminFormState,formData:FormData){return saveSource(formData)}
 export async function updateSource(id:string,_:AdminFormState,formData:FormData){return saveSource(formData,id)}
